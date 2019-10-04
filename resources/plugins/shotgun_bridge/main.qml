@@ -14,8 +14,8 @@ import QtQuick.Window 2.2
 import "."
 
 
-PainterPlugin
-{
+PainterPlugin {
+
   id: root
   property var openMenuButton: null
   property bool isEngineLoaded: false
@@ -68,8 +68,8 @@ PainterPlugin
     alg.log.exception("Shotgun engine | " + message.toString());
   }
 
-  Component.onCompleted:
-  {
+  Component.onCompleted: {
+
     log_debug("Initializing Shotgun Bridge Plugin.");
 
     // get the port we have been assigned from sthe startup software launcher
@@ -107,8 +107,7 @@ PainterPlugin
     }
   }
 
-  onNewProjectCreated:
-  {
+  onNewProjectCreated: {
     // Called when a new project is created, before the onProjectOpened callback
 
     // no chance this project is saved, but if a mesh that is known by
@@ -121,8 +120,7 @@ PainterPlugin
     }
   }
 
-  onProjectOpened:
-  {
+  onProjectOpened: {
     // Called when the project is fully loaded
     server.sendCommand("PROJECT_OPENED", {path:currentProjectPath()});
   }
@@ -163,10 +161,15 @@ PainterPlugin
   function onProcessEndedCallback(result)
   {
     // We try to keep the engine alive by restarting it if something went wrong.
-    log_warning("Shotgun Substance Painter Engine connection was lost. Restarting engine...");
+    log_warning("Shotgun Substance Painter Engine connection was lost.");
     if (result.crashed)
     {
+      log_warning("Restarting engine...");
       bootstrapEngine();
+    }
+    else
+    {
+      log_error(result.cout);
     }
   }
 
@@ -487,8 +490,8 @@ PainterPlugin
     server.debug = data.enabled;
   }
 
-  CommandServer
-  {
+  CommandServer {
+
     id: server
     Component.onCompleted:
     {
@@ -530,21 +533,20 @@ PainterPlugin
     }
   }
 
-  FileDialog
-  {
+  FileDialog {
+
     id: saveSessionDialog
     title: "Save Project"
     selectExisting : false
     nameFilters: [ "Substance Painter files (*.spp)" ]
 
-    onAccepted:
-    {
+    onAccepted: {
       var url = fileUrl.toString();
       alg.project.save(url, alg.project.SaveMode.Full);
       return true;
     }
-    onRejected:
-    {
+
+    onRejected: {
       return false;
     }
   }
