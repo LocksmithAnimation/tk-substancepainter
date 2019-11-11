@@ -203,8 +203,8 @@ PainterPlugin {
     server.sendCommand("DISPLAY_MENU", {clickedPosition: root.openMenuButton.clickedPosition});
   }
 
- function sendProjectInfo() 
- {
+  function sendProjectInfo() 
+  {
     try
     {
         server.sendCommand("OPENED_PROJECT_INFO", {
@@ -242,6 +242,58 @@ PainterPlugin {
   function cleanUrl(url) 
   {
     return alg.fileIO.localFileToUrl(alg.fileIO.urlToLocalFile(url));
+  }
+
+  function createProject(data) 
+  {
+    alg.log.info("LSA: createProject called, data: " + JSON.stringify(data));
+
+    var geom_path = data["path"];
+    var geom_url = alg.fileIO.localFileToUrl(geom_path);
+    alg.log.info("LSA: Creating project for mesh file: " + geom_path)
+    alg.log.info("LSA: URL for local file: " + geom_url)
+
+    try {
+      alg.project.create(geom_url);
+    } catch (err) {
+      alg.log.exception(err);
+    }
+
+
+    // var projectOpened = alg.project.isOpen();
+    // var isAlreadyOpen = false;
+
+    // var url = alg.fileIO.localFileToUrl(data.path);
+
+    // try 
+    // {
+    //   isAlreadyOpen = cleanUrl(alg.project.url()) == cleanUrl(url);
+    // }
+    // catch (err) 
+    // {
+    //   alg.log.exception(err);
+    // }
+
+    // // If the project is already opened, keep it
+    // try
+    // {
+    //   if (!isAlreadyOpen)
+    //   {
+    //     if (projectOpened)
+    //     {
+    //       // TODO: Ask the user if he wants to save its current opened project
+    //       alg.project.close();
+    //     }    
+    //     alg.project.open(url);
+    //   }
+    // }
+    // catch (err) 
+    // {
+    //   alg.log.exception(err)
+    //   return false;
+    // }
+
+    return true;
   }
 
   function openProject(data) 
@@ -504,6 +556,7 @@ PainterPlugin {
       registerCallback("SEND_PROJECT_INFO", sendProjectInfo);
       registerCallback("GET_VERSION", getVersion);
       registerCallback("ENGINE_READY", engineReady);
+      registerCallback("CREATE_PROJECT", createProject);
       registerCallback("OPEN_PROJECT", openProject);
       registerCallback("GET_CURRENT_PROJECT_PATH", currentProjectPath);
       registerCallback("SAVE_PROJECT", saveProject);

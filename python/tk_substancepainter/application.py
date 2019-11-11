@@ -1,6 +1,5 @@
 """
 Module that encapsulates access to the actual application
-
 """
 
 import os
@@ -223,6 +222,9 @@ class EngineClient(Client):
         path = self.send_and_receive("GET_CURRENT_PROJECT_PATH")
         self.log_debug("CURRENT_PROJECT_PATH: %s (%s)" % (path, type(path)))
         return path
+
+    def create_project(self, geom_path):
+        result = self.send_and_receive("CREATE_PROJECT", path=geom_path)
 
     def need_saving(self):
         result = self.send_and_receive("NEEDS_SAVING", path=path)
