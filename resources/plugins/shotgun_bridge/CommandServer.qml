@@ -18,39 +18,11 @@ Item {
   property alias port: server.port
   property alias currentWebSocket: server.currentWebSocket
   readonly property bool connected: currentWebSocket !== null
-  property bool debug: false;
 
   signal jsonMessageReceived(var command, var jsonData)
 
   property var _callbacks: null
   property var m_id: 1
-
-
-  function log_info(message)
-  {
-    alg.log.info("Shotgun bridge: " + message.toString());
-  }
- 
-  function log_warning(message)
-  {
-    alg.log.warning("Shotgun bridge: " + message.toString());
-  }
- 
-  function log_debug(message)
-  {
-    if (root.debug)
-      alg.log.info("(DEBUG) Shotgun bridge: " + message.toString());
-  }
- 
-  function log_error(message)
-  {
-    alg.log.error("Shotgun bridge: " + message.toString());
-  }
- 
-  function log_exception(message)
-  {
-    alg.log.exception("Shotgun bridge: " + message.toString());
-  }
 
   function registerCallback(command, callback) {
     if (_callbacks === null) {
@@ -71,7 +43,6 @@ Item {
                           "params": data,
                           "id": m_id};
 
-      log_debug("Sending:" + JSON.stringify(jsonData));
       server.currentWebSocket.sendTextMessage(JSON.stringify(jsonData));
     }
     catch(err) {
@@ -91,13 +62,10 @@ Item {
     try 
     {
       jsonData = {"jsonrpc": "2.0", "result": result, "id": message_id};
-      log_debug("Sending Response:" + JSON.stringify(jsonData));
       server.currentWebSocket.sendTextMessage(JSON.stringify(jsonData));
-      log_debug("Sent.");
     }
     catch(err) {
       jsonData = {"jsonrpc": "2.0", "error": err || null, "id": message_id};
-      log_debug("Sending error:" + JSON.stringify(jsonData));
       server.currentWebSocket.sendTextMessage(JSON.stringify(jsonData));
       alg.log.error(qsTr("Unexpected error while sending \"%1\" message id: %2").arg(message_id).arg(err.message));
     }
@@ -140,11 +108,10 @@ Item {
             .arg(err.message));
           return;
         }
-        log_debug("Message received: " + message)
 
         if (root._callbacks && command in root._callbacks) {
           try {
-            var result = root._callbacks[command](jsonData.params)
+            var result = root._callbacks[command](jsonData.params);
             root.sendResult(jsonData.id, result);
           }
           catch(err) {
@@ -153,7 +120,7 @@ Item {
         }
         else
         {
-          log_debug("Message received was ignored: " + message)        
+          alg.log.info("(DEBUG) Shotgun bridge: Message received was ignored: " + message);
         }
         root.jsonMessageReceived(command, jsonData);
       })

@@ -6,11 +6,11 @@
 // __email__ = "diegogh2000@gmail.com"
 
 
-import QtQuick 2.2
+import QtQuick 2.12
 import Painter 1.0
 import Qt.labs.platform 1.0
-import QtQuick.Dialogs 1.2
-import QtQuick.Window 2.2
+import QtQuick.Dialogs 1.3
+import QtQuick.Window 2.12
 import "."
 
 
@@ -18,9 +18,10 @@ PainterPlugin {
 
   id: root
   property var openMenuButton: null
+  property var passData: null
   property bool isEngineLoaded: false
   // property double shotgun_heartbeat_interval: 1.0; 
-  property bool debug: true;
+  property bool debug: false;
 
   function log_info(data)
   {
@@ -85,6 +86,12 @@ PainterPlugin {
       log_warning("Not in an shotgun toolkit environment so the engine won't be run. Have you launched Substance Painter through the Shotgun Desktop application ?");
       return;
     }
+  
+    if (query.TK_DEBUG == "true")
+    {
+      root.debug = true;
+      log_debug("Global debug logging is active.");
+    }
 
     var sgtk_substancepainter_engine_port = query.SGTK_SUBSTANCEPAINTER_ENGINE_PORT;
     
@@ -111,7 +118,7 @@ PainterPlugin {
     // Called when a new project is created, before the onProjectOpened callback
 
     // no chance this project is saved, but if a mesh that is known by
-    // toolkit is loaded, we can change the context of teh engine
+    // toolkit is loaded, we can change the context of the engine
     var mesh_url = alg.project.lastImportedMeshUrl();
     if (mesh_url)
     {
@@ -123,6 +130,7 @@ PainterPlugin {
   onProjectOpened: {
     // Called when the project is fully loaded
     server.sendCommand("PROJECT_OPENED", {path:currentProjectPath()});
+    alg.log.info(JSON.stringify(alg.project.settings));
   }
 
   // Timer {
@@ -244,94 +252,78 @@ PainterPlugin {
     return alg.fileIO.localFileToUrl(alg.fileIO.urlToLocalFile(url));
   }
 
-  function createProject(data) 
+  function createProject(data)
   {
-    alg.log.info("LSA: createProject called, data: " + JSON.stringify(data));
+    passData = data;
 
-    var geom_path = data["path"];
-    var geom_url = alg.fileIO.localFileToUrl(geom_path);
-    alg.log.info("LSA: Creating project for mesh file: " + geom_path)
-    alg.log.info("LSA: URL for local file: " + geom_url)
-
-    try {
-      alg.project.create(geom_url);
-    } catch (err) {
-      alg.log.exception(err);
+    try
+    {
+      if (alg.project.isOpen())
+      {
+        if (alg.project.needSaving())
+        {
+          unsavedFileDialog.doCommand = doCreate;
+          unsavedFileDialog.open();
+        }
+        else
+        {
+          alg.project.close();
+          doCreate();
+        }
+      }
+      else
+      {
+        doCreate();
+      }
     }
-
-
-    // var projectOpened = alg.project.isOpen();
-    // var isAlreadyOpen = false;
-
-    // var url = alg.fileIO.localFileToUrl(data.path);
-
-    // try 
-    // {
-    //   isAlreadyOpen = cleanUrl(alg.project.url()) == cleanUrl(url);
-    // }
-    // catch (err) 
-    // {
-    //   alg.log.exception(err);
-    // }
-
-    // // If the project is already opened, keep it
-    // try
-    // {
-    //   if (!isAlreadyOpen)
-    //   {
-    //     if (projectOpened)
-    //     {
-    //       // TODO: Ask the user if he wants to save its current opened project
-    //       alg.project.close();
-    //     }    
-    //     alg.project.open(url);
-    //   }
-    // }
-    // catch (err) 
-    // {
-    //   alg.log.exception(err)
-    //   return false;
-    // }
-
+    
+    catch (err)
+    {
+      alg.log.exception(err);
+      passData = null;
+      return false;
+    }
     return true;
+  }
+
+  function doCreate()
+  {
+    var data = passData;
+    alg.project.create(alg.fileIO.localFileToUrl(data["path"]), [], alg.fileIO.localFileToUrl(data["template_path"]), data["project_settings"]);
+    passData = null;
   }
 
   function openProject(data) 
   {
-    var projectOpened = alg.project.isOpen();
-    var isAlreadyOpen = false;
+    passData = data;
 
-    var url = alg.fileIO.localFileToUrl(data.path);
-
-    try 
-    {
-      isAlreadyOpen = cleanUrl(alg.project.url()) == cleanUrl(url);
-    }
-    catch (err) 
-    {
-      alg.log.exception(err);
-    }
-
-    // If the project is already opened, keep it
     try
     {
-      if (!isAlreadyOpen)
+      if (alg.project.isOpen() && alg.project.needSaving())
       {
-        if (projectOpened)
-        {
-          // TODO: Ask the user if he wants to save its current opened project
-          alg.project.close();
-        }    
-        alg.project.open(url);
+        unsavedFileDialog.doCommand = doOpen;
+        unsavedFileDialog.open();
+      }
+      else
+      {
+        doOpen();
       }
     }
-    catch (err) 
+    
+    catch (err)
     {
-      alg.log.exception(err)
+      alg.log.exception(err);
+      passData = null;
       return false;
     }
-
     return true;
+  }
+
+  function doOpen()
+  {
+    var url = alg.fileIO.localFileToUrl(passData.path);
+    alg.project.open(url);
+    passData = null;
   }
 
   function currentProjectPath(data)
@@ -342,16 +334,16 @@ PainterPlugin {
       if (projectOpened)
       {
         var path = alg.fileIO.urlToLocalFile(alg.project.url());
-        return path
+        return path;
       }
       else
       {
-        return "Untitled.spp"
+        return "";
       }    
     }
     catch (err)
     {
-      return "Untitled.spp"
+      return "";
     }
   }
 
@@ -376,7 +368,7 @@ PainterPlugin {
     }
   }
 
-  
+
   function saveProjectAs(data)
   {
     try
@@ -537,10 +529,16 @@ PainterPlugin {
 
   function toggleDebugLogging(data)
   {
-    alg.log.debug("Debug Logging is : " + data.enabled);
+    alg.log.info("Debug Logging is : " + data.enabled);
     root.debug = data.enabled;
-    server.debug = data.enabled;
   }
+
+  function getShelves(data)
+  {
+    var shelves = alg.resources.shelves();
+    return shelves;
+  }
+
 
   CommandServer {
 
@@ -574,6 +572,7 @@ PainterPlugin {
       registerCallback("UPDATE_DOCUMENT_RESOURCES", updateDocumentResources);
       registerCallback("DOCUMENT_RESOURCES", documentResources);
       registerCallback("TOGGLE_DEBUG_LOGGING", toggleDebugLogging);
+      registerCallback("GET_SHELVES", getShelves);
       //checkConnectionTimer.start();
     }
 
@@ -593,14 +592,72 @@ PainterPlugin {
     selectExisting : false
     nameFilters: [ "Substance Painter files (*.spp)" ]
 
-    onAccepted: {
+    onAccepted:
+    {
       var url = fileUrl.toString();
       alg.project.save(url, alg.project.SaveMode.Full);
       return true;
     }
-
-    onRejected: {
+    onRejected:
+    {
       return false;
     }
+  }
+
+  MessageDialog
+  {
+    id: unsavedFileDialog
+    property bool acceptToggle: false
+    property var doCommand: null
+    title: "Substance Painter"
+    icon: StandardIcon.NoIcon
+    text: "The project has been modified.\n\nDo you want to save your changes?"
+    modality: Qt.ApplicationModal
+    standardButtons: StandardButton.Save | StandardButton.Discard | StandardButton.Cancel
+    onAccepted:
+    {
+      acceptToggle = !acceptToggle;
+      if (acceptToggle)
+      {
+        var doIt = true;
+        try
+        {
+          alg.project.url();
+        }
+        catch (err)
+        {
+          doIt = false;
+          if (err instanceof alg.project.ProjectError)
+          {
+            cantSaveDialog.open();
+          }
+          else
+          {
+            alg.log.exception(err);
+          }
+        }
+        if (doIt)
+        {
+          alg.project.save();
+          alg.project.close();
+          doCommand();
+        }
+      }
+    }
+    onDiscard:
+    {
+      alg.project.close();
+      doCommand();
+    }
+  }
+
+  MessageDialog
+  {
+    id: cantSaveDialog
+    title: "Substance Painter"
+    icon: StandardIcon.NoIcon
+    text: "This project has not been saved.\n\nPlease save through Shotgun interface."
+    modality: Qt.ApplicationModal
+    standardButtons: StandardButton.Ok
   }
 }

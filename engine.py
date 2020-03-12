@@ -36,26 +36,24 @@ __contact__ = "https://www.linkedin.com/in/diegogh/"
 # when Substance Painter software version is above the tested one.
 SHOW_COMP_DLG = "SGTK_COMPATIBILITY_DIALOG_SHOWN"
 
+# # logging functionality
+# def display_error(msg):
+#     t = time.asctime(time.localtime())
+#     print("%s - Shotgun Error | Substance Painter engine | %s " % (t, msg))
 
-# logging functionality
-def display_error(msg):
-    t = time.asctime(time.localtime())
-    print("%s - Shotgun Error | Substance Painter engine | %s " % (t, msg))
-
-def display_warning(msg):
-    t = time.asctime(time.localtime())
-    print("%s - Shotgun Warning | Substance Painter engine | %s " % (t, msg))
+# def display_warning(msg):
+#     t = time.asctime(time.localtime())
+#     print("%s - Shotgun Warning | Substance Painter engine | %s " % (t, msg))
 
 
-def display_info(msg):
-    t = time.asctime(time.localtime())
-    print("%s - Shotgun Info | Substance Painter engine | %s " % (t, msg))
+# def display_info(msg):
+#     t = time.asctime(time.localtime())
+#     print("%s - Shotgun Info | Substance Painter engine | %s " % (t, msg))
 
-def display_debug(msg):
-    if os.environ.get("TK_DEBUG") == "1":
-        t = time.asctime(time.localtime())
-        print("%s - Shotgun Debug | Substance Painter engine | %s " % (t, msg))
-
+# def display_debug(msg):
+#     if os.environ.get("TK_DEBUG") == "1":
+#         t = time.asctime(time.localtime())
+#         print("%s - Shotgun Debug | Substance Painter engine | %s " % (t, msg))
 
 # methods to support the state when the engine cannot start up
 # for example if a non-tank file is loaded in Substance Painter we load the 
@@ -146,52 +144,53 @@ class SubstancePainterEngine(Engine):
         self._qt_app = None
         self._dcc_app = None
         self._menu_generator = None
+        self.utils = None
 
         Engine.__init__(self, *args, **kwargs)
 
     @property
     def app(self):
         """
-        Represents the DDC app connection
+        Represents the DCC app connection
         """
         return self._dcc_app
+    
+    # def show_message(self, msg, level="info"):
+    #     """
+    #     Displays a dialog with the message according to  the severity level
+    #     specified.
+    #     """
+    #     if self._qt_app_central_widget:
+    #         from sgtk.platform.qt5 import QtWidgets, QtGui, QtCore
+    #         level_icon = {"info": QtWidgets.QMessageBox.Information, 
+    #                       "error": QtWidgets.QMessageBox.Critical,
+    #                       "warning": QtWidgets.QMessageBox.Warning}
 
-    def show_message(self, msg, level="info"):
-        """
-        Displays a dialog with the message according to  the severity level
-        specified.
-        """
-        if self._qt_app_central_widget:
-            from sgtk.platform.qt5 import QtWidgets, QtGui, QtCore
-            level_icon = {"info": QtWidgets.QMessageBox.Information, 
-                          "error": QtWidgets.QMessageBox.Critical,
-                          "warning": QtWidgets.QMessageBox.Warning}
+    #         dlg = QtWidgets.QMessageBox(self._qt_app_central_widget)
+    #         dlg.setIcon(level_icon[level])
+    #         dlg.setText(msg)
+    #         dlg.setWindowTitle("Shotgun Substance Painter Engine")
+    #         dlg.setWindowFlags(dlg.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+    #         dlg.show()
+    #         dlg.exec_()
 
-            dlg = QtWidgets.QMessageBox(self._qt_app_central_widget)
-            dlg.setIcon(level_icon[level])
-            dlg.setText(msg)
-            dlg.setWindowTitle("Shotgun Substance Painter Engine")
-            dlg.setWindowFlags(dlg.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
-            dlg.show()
-            dlg.exec_()
+    # def show_error(self, msg):
+    #     """
+    #     Displays an error dialog message
+    #     """
+    #     self.show_message(msg, level="error")
 
-    def show_error(self, msg):
-        """
-        Displays an error dialog message
-        """
-        self.show_message(msg, level="error")
+    # def show_warning(self, msg):
+    #     """
+    #     Displays a warning dialog message
+    #     """
+    #     self.show_message(msg, level="warning")
 
-    def show_warning(self, msg):
-        """
-        Displays a warning dialog message
-        """
-        self.show_message(msg, level="warning")
-
-    def show_info(self, msg):
-        """
-        Displays an informative dialog message
-        """
-        self.show_message(msg, level="info")
+    # def show_info(self, msg):
+    #     """
+    #     Displays an informative dialog message
+    #     """
+    #     self.show_message(msg, level="info")
 
     def __get_platform_resource_path(self, filename):
         """
@@ -211,12 +210,12 @@ class SubstancePainterEngine(Engine):
         """
         return True
 
-    def __toggle_debug_logging(self):
+    def _Engine__toggle_debug_logging(self):
         """
         Toggles global debug logging on and off in the log manager.
         This will affect all logging across all of toolkit.
         """
-        self.logger.debug("calling substance painer with debug: %s" % LogManager().global_debug)
+        self.logger.debug("Setting Substance Logging to: %s" % (not LogManager().global_debug))
 
         # flip debug logging
         LogManager().global_debug = not LogManager().global_debug
@@ -317,7 +316,7 @@ class SubstancePainterEngine(Engine):
         """
         This method takes care of requests from the dcc app.
         """
-        self.logger.info("process_request. method: %s | kwargs: %s" % (method, kwargs))
+        self.logger.debug("process_request. method: %s | kwargs: %s" % (method, kwargs))
         
         if method == "DISPLAY_MENU":
             menu_position = None
@@ -355,6 +354,7 @@ class SubstancePainterEngine(Engine):
         self.tk_substancepainter = self.import_module("tk_substancepainter")
 
         self.init_qt_app()
+        self.utils = self.tk_substancepainter.utils
 
         port = os.environ['SGTK_SUBSTANCEPAINTER_ENGINE_PORT']
         url = "ws://localhost:%s" % port
@@ -413,10 +413,10 @@ class SubstancePainterEngine(Engine):
                     if int(major_version_number_str) < min_ver:
                         show_warning_dlg = False
 
-            if show_warning_dlg:
-                # Note, title is padded to try to ensure dialog isn't insanely
-                # narrow!
-                self.show_warning(msg)
+            # if show_warning_dlg:
+            #     # Note, title is padded to try to ensure dialog isn't insanely
+            #     # narrow!
+            #     self.show_warning(msg)
 
             # always log the warning to the script editor:
             self.logger.warning(msg)
@@ -632,26 +632,25 @@ class SubstancePainterEngine(Engine):
         # where "basename" is the leaf part of the logging record name,
         # for example "tk-multi-shotgunpanel" or "qt_importer".
         if record.levelno < logging.INFO:
-            formatter = logging.Formatter(
-                "Debug: Shotgun %(basename)s: %(message)s")
+            formatter = logging.Formatter("Debug: Shotgun %(basename)s: %(message)s")
         else:
             formatter = logging.Formatter("Shotgun %(basename)s: %(message)s")
 
         msg = formatter.format(record)
-
         # Select Substance Painter display function to use according to the logging
         # record level.
-        if record.levelno >= logging.ERROR:
-            fct = display_error
-        elif record.levelno >= logging.WARNING:
-            fct = display_warning
-        elif record.levelno >= logging.INFO:
-            fct = display_info
-        else:
-            fct = display_debug
+        if self.app:
+            if record.levelno >= logging.ERROR:
+                fct = self.app.log_error
+            elif record.levelno >= logging.WARNING:
+                fct = self.app.log_warning
+            elif record.levelno >= logging.INFO:
+                fct = self.app.log_info
+            else:
+                fct = self.app.log_debug
 
-        # Display the message in Substance Painter script editor in a thread safe manner.
-        self.async_execute_in_main_thread(fct, msg)
+            # Display the message in Substance Painter script editor in a thread safe manner.
+            self.async_execute_in_main_thread(fct, msg)
 
 
     def close_windows(self):

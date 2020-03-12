@@ -17,6 +17,7 @@ import tank
 import sys
 import os
 import unicodedata
+import operator
 
 
 __author__ = "Diego Garcia Huerta"
@@ -55,7 +56,24 @@ class MenuGenerator(object):
         self.menu_handle.activateWindow()
         self.menu_handle.raise_()
         self.menu_handle.exec_(pos)
+    
+    def create_menu_test(self, disabled=False):
+        #Test for icon based menu. Needs work.
+        self.menu_handle.clear()
+
+        if disabled:
+            self.menu_handle.addMenu("Sgtk is disabled.")
+            return
         
+        menu_items = []
+        for (cmd_name, cmd_details) in self._engine.commands.items():
+            menu_items.append(AppCommand(cmd_name, self, cmd_details))
+
+        menu_items.sort(key=operator.attrgetter("app_name", "name"))
+        for cmd in menu_items:
+            self._add_menu_item("", self.menu_handle, cmd.callback, cmd.properties)
+
+
     def create_menu(self, disabled=False):
         """
         Render the entire Shotgun menu.
@@ -111,7 +129,7 @@ class MenuGenerator(object):
 
             else:
                 # normal menu
-                app_name = cmd.get_app_name()
+                app_name = cmd.app_name
                 if app_name is None:
                     # un-parented app
                     app_name = "Other Items"
@@ -126,7 +144,7 @@ class MenuGenerator(object):
         self._add_divider(self.menu_handle)
 
         # add menu divider
-        self._add_menu_item("-- Exit Menu --", self.menu_handle, self.menu_handle.hide)
+        self._add_menu_item("Exit Menu", self.menu_handle, self.menu_handle.hide)
 
     def _add_divider(self, parent_menu):
         divider = QtWidgets.QAction(parent_menu)
@@ -145,6 +163,9 @@ class MenuGenerator(object):
         action.triggered.connect(callback)
 
         if properties:
+            # if "icon" in properties:
+            #     icon = QtGui.QIcon(properties["icon"])
+            #     action.setIcon(icon)
             if "tooltip" in properties:
                 action.setTooltip(properties["tooltip"])
                 action.setStatustip(properties["tooltip"])
@@ -251,7 +272,8 @@ class AppCommand(object):
         self.callback = command_dict["callback"]
         self.favourite = False
 
-    def get_app_name(self):
+    @property
+    def app_name(self):
         """
         Returns the name of the app that this command belongs to
         """

@@ -172,9 +172,6 @@ class SubstancePainterLauncher(SoftwareLauncher):
 
     EXECUTABLE_TEMPLATES = {
         "darwin": ["/Applications/Allegorithmic/Substance Painter.app"],
-        "win32": [
-            "C:/Program Files/Allegorithmic/Substance Painter/Substance Painter.exe"
-        ],
         "linux2": ["/usr/Allegorithmic/Substance Painter",
                    "/usr/Allegorithmic/Substance_Painter/Substance Painter",
                    "/opt/Allegorithmic/Substance_Painter/Substance Painter"],
@@ -229,6 +226,8 @@ class SubstancePainterLauncher(SoftwareLauncher):
         ] = sgtk.get_sgtk_module_path()
 
         required_env["SGTK_SUBSTANCEPAINTER_ENGINE_PORT"] = str(get_free_port())
+
+        required_env["TK_DEBUG"] = os.environ.get("TK_DEBUG") and "true" or ""
 
         if file_to_open:
             # Add the file name to open to the launch environment
@@ -311,47 +310,24 @@ class SubstancePainterLauncher(SoftwareLauncher):
         """
         Find executables in the default install locations.
         """
-
-        # all the executable templates for the current OS
-        executable_templates = self.EXECUTABLE_TEMPLATES.get(sys.platform, [])
+        from rez import packages_
 
         # all the discovered executables
         sw_versions = []
 
-        for executable_template in executable_templates:
-
-            self.logger.debug("Processing template %s.", executable_template)
-
-            executable_matches = self._glob_and_match(
-                executable_template, self.COMPONENT_REGEX_LOOKUP
+        for package in packages_.iter_packages("substancepainter"):
+            self.logger.debug(
+                "Software found: %s | %s.",
+                str(package.version),
+                package.executable,
             )
-
-            # Extract all products from that executable.
-            for (executable_path, key_dict) in executable_matches:
-
-                # extract the matched keys form the key_dict (default to None
-                # if not included)
-                if sys.platform == "win32":
-                    executable_version = get_file_info(
-                        executable_path, "FileVersion"
-                    )
-                    # make sure we remove those pesky \x00 characters
-                    executable_version = executable_version.strip("\x00")
-                else:
-                    executable_version = key_dict.get("version", "2018.0.0")
-
-                self.logger.debug(
-                    "Software found: %s | %s.",
-                    executable_version,
-                    executable_template,
+            sw_versions.append(
+                SoftwareVersion(
+                    str(package.version),
+                    "Substance Painter",
+                    package.executable,
+                    self._icon_from_engine(),
                 )
-                sw_versions.append(
-                    SoftwareVersion(
-                        executable_version,
-                        "Substance Painter",
-                        executable_path,
-                        self._icon_from_engine(),
-                    )
-                )
+            )
 
         return sw_versions

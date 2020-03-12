@@ -50,18 +50,14 @@ class Client(QtCore.QObject):
         self.wait_period = 1
 
         # borrow the engine logger
-        self.log_info = engine.log_info
-        self.log_debug = engine.log_debug
-        self.log_warning = engine.log_warning
-        self.log_error = engine.log_error
 
-        self.log_debug("Client started. - %s " % url)
+        self.engine.log_debug("Client started. - %s " % url)
 
         # A bit of a hack to get responses from the server
         # I cannot wait for python3 concurrency!
         # reference: https://stackoverflow.com/questions/9523370/adding-attributes-to-instance-methods-in-python
         def send_and_receive(self, command, **kwargs):
-            # self.log_debug("send_and_receive: message %s" % command)
+            self.engine.log_debug("send_and_receive: message %s" % command)
 
             # exit the loop if timeout happens
             timeout_timer = QtCore.QTimer(
@@ -74,10 +70,10 @@ class Client(QtCore.QObject):
 
             def await_for_response(result):
                 self.send_and_receive.data = result
-                # self.log_debug("exiting the loop: result %s" % result)
+                self.engine.log_debug("exiting the loop: result %s" % result)
                 loop.quit()
 
-            # self.log_debug("in the loop...")
+            self.engine.log_debug("in the loop...")
             self.send_text_message(
                 command, callback=await_for_response, **kwargs
             )
@@ -94,30 +90,42 @@ class Client(QtCore.QObject):
         # connect to server
         self.connect_to_server()
 
+    def log_info(self, message):
+        pass
+
+    def log_debug(self, message):
+        pass
+
+    def log_warning(self, message):
+        pass
+
+    def log_error(self, message):
+        pass
+
     def connect_to_server(self):
-        self.log_debug("Client start connection | %s " % QtCore.QUrl(self.url))
+        self.engine.log_debug("Client start connection | %s " % QtCore.QUrl(self.url))
         result = self.client.open(QtCore.QUrl(self.url))
-        self.log_debug("Client start connection | result | %s " % result)
+        self.engine.log_debug("Client start connection | result | %s " % result)
 
     def ping(self):
-        self.log_debug("client: do_ping")
+        self.engine.log_debug("client: do_ping")
         self.client.ping()
 
     def on_connected(self):
         pass
-        self.log_debug("client: on_connected")
+        self.engine.log_debug("client: on_connected")
 
     def on_disconnected(self):
-        self.log_debug("client: on_disconnected")
+        self.engine.log_debug("client: on_disconnected")
         self.engine.process_request("QUIT")
 
     def on_error(self, error_code):
-        self.log_error("client: on_error: {}".format(error_code))
-        self.log_error(self.client.errorString())
+        self.engine.log_error("client: on_error: {}".format(error_code))
+        self.engine.log_error(self.client.errorString())
         self.engine.process_request("QUIT")
 
     def on_state_changed(self, state):
-        self.log_debug("client: on_state_changed: %s" % state)
+        self.engine.log_debug("client: on_state_changed: %s" % state)
         state = self.client.state()
         if state == QAbstractSocket.SocketState.ConnectingState:
             return
@@ -127,26 +135,26 @@ class Client(QtCore.QObject):
             QAbstractSocket.SocketState.ConnectedState,
         ):
             attempts += 1
-            self.log_debug("client: attempted to reconnect : %s" % attempts)
+            self.engine.log_debug("client: attempted to reconnect : %s" % attempts)
             self.connect_to_server()
             time.sleep(self.wait_period)
 
     def on_text_message_received(self, message):
-        # self.log_debug("client: on_text_message_received: %s" % (message))
+        # self.engine.log_debug("client: on_text_message_received: %s" % (message))
         jsonData = json.loads(message)
         message_id = jsonData.get("id")
 
         # requesting data
         if jsonData.has_key("method"):
-            # self.log_debug("client: request detected: %s" % (message))
+            # self.engine.log_debug("client: request detected: %s" % (message))
             method = jsonData.get("method")
             params = jsonData.get("params")
             self.engine.process_request(method, **params)
 
         if jsonData.has_key("result"):
-            # self.log_debug("client: result detected: %s" % (message))
+            # self.engine.log_debug("client: result detected: %s" % (message))
             if message_id in self.callbacks:
-                # self.log_debug(
+                # self.engine.log_debug(
                 #     "client: requesting callback result for message: %s"
                 #     % message_id
                 # )
@@ -161,9 +169,9 @@ class Client(QtCore.QObject):
             QAbstractSocket.SocketState.ClosingState,
             QAbstractSocket.SocketState.UnconnectedState,
         ):
-            # self.log_debug(
-            #     "client: is not connected!, ignoring message: %s" % message_id
-            # )
+            self.engine.log_debug(
+                "client: is not connected!, ignoring message: %s" % message_id
+            )
             return
 
         # wait until connected
@@ -171,7 +179,7 @@ class Client(QtCore.QObject):
             self.client.state() == QAbstractSocket.SocketState.ConnectingState
         ):
             QCoreApplication.processEvents()
-            # self.log_debug("client: waiting state: %s" % self.client.state())
+            #self.engine.log_debug("client: waiting state: %s" % self.client.state())
             time.sleep(self.wait_period)
             pass
 
@@ -190,12 +198,12 @@ class Client(QtCore.QObject):
             }
         )
 
-        # self.log_debug("client: send_message: %s" % message)
+        #self.engine.log_debug("client: send_message: %s" % message)
         self.client.sendTextMessage(message)
         return message_id
 
     def on_pong(self, elapsedTime, payload):
-        # self.log_debug(
+        # self.engine.log_debug(
         #     "client: onPong - time: {} ; payload: {}".format(
         #         elapsedTime, payload
         #     )
@@ -203,7 +211,7 @@ class Client(QtCore.QObject):
         pass
 
     def close(self):
-        self.log_debug("client: closed.")
+        self.engine.log_debug("client: closed.")
         self.client.close()
 
 
@@ -213,21 +221,22 @@ class EngineClient(Client):
 
     def get_application_version(self):
         version = self.send_and_receive("GET_VERSION")
-        self.log_debug("version: %s (%s)" % (version, type(version)))
+        self.engine.log_debug("version: %s (%s)" % (version, type(version)))
         painter_version = version["painter"]
-        self.log_debug("painter_version: %s" % painter_version)
+        self.engine.log_debug("painter_version: %s" % painter_version)
         return painter_version
 
     def get_current_project_path(self):
         path = self.send_and_receive("GET_CURRENT_PROJECT_PATH")
-        self.log_debug("CURRENT_PROJECT_PATH: %s (%s)" % (path, type(path)))
+        self.engine.log_debug("CURRENT_PROJECT_PATH: %s (%s)" % (path, type(path)))
         return path
 
-    def create_project(self, geom_path):
-        result = self.send_and_receive("CREATE_PROJECT", path=geom_path)
+    def create_project(self, geom_path, template_path, project_settings):
+        result = self.send_and_receive("CREATE_PROJECT", path=geom_path, template_path=template_path, project_settings=project_settings)
+        return result
 
     def need_saving(self):
-        result = self.send_and_receive("NEEDS_SAVING", path=path)
+        result = self.send_and_receive("NEEDS_SAVING")
         return result
 
     def open_project(self, path):
@@ -303,6 +312,10 @@ class EngineClient(Client):
         result = self.send_and_receive("DOCUMENT_RESOURCES")
         return result
 
+    def get_shelves(self):
+        result = self.send_and_receive("GET_SHELVES")
+        return result
+
     def log_info(self, message):
         self.send_text_message("LOG_INFO", message=message)
 
@@ -323,6 +336,7 @@ class EngineClient(Client):
 
 
 if __name__ == "__main__":
+    # Is this doing anything?
     global client
     app = QApplication(sys.argv)
     client = Client(app)
