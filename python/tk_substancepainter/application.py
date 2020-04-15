@@ -231,16 +231,16 @@ class EngineClient(Client):
         self.engine.log_debug("CURRENT_PROJECT_PATH: %s (%s)" % (path, type(path)))
         return path
 
-    def create_project(self, geom_path, template_path, project_settings):
-        result = self.send_and_receive("CREATE_PROJECT", path=geom_path, template_path=template_path, project_settings=project_settings)
+    def create_project(self, geom_path, template_path, project_settings, check=True):
+        result = self.send_and_receive("CREATE_PROJECT", path=geom_path, template_path=template_path, project_settings=project_settings, check=check)
         return result
 
     def need_saving(self):
         result = self.send_and_receive("NEEDS_SAVING")
         return result
 
-    def open_project(self, path):
-        path = self.send_and_receive("OPEN_PROJECT", path=path)
+    def open_project(self, path, check=True):
+        path = self.send_and_receive("OPEN_PROJECT", path=path, check=check)
 
     def save_project_as(self, path):
         success = self.send_and_receive("SAVE_PROJECT_AS", path=path)
@@ -335,14 +335,14 @@ class EngineClient(Client):
         self.send_text_message("TOGGLE_DEBUG_LOGGING", enabled=enabled)
 
 
-if __name__ == "__main__":
-    # Is this doing anything?
-    global client
-    app = QApplication(sys.argv)
-    client = Client(app)
-    version = get_application_version(client)
-    client.log_debug("application_version: %s" % version)
-    version2 = get_application_version(client)
-    client.log_debug("application_version2: %s" % version2)
+# if __name__ == "__main__":
+#     # Is this doing anything?
+#     global client
+#     app = QApplication(sys.argv)
+#     client = Client(app)
+#     version = get_application_version(client)
+#     client.log_debug("application_version: %s" % version)
+#     version2 = get_application_version(client)
+#     client.log_debug("application_version2: %s" % version2)
 
-    app.exec_()
+#     app.exec_()

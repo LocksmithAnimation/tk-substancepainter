@@ -73,7 +73,7 @@ PainterPlugin {
 
     log_debug("Initializing Shotgun Bridge Plugin.");
 
-    // get the port we have been assigned from sthe startup software launcher
+    // get the port we have been assigned from the startup software launcher
     var args = Qt.application.arguments[1];
     var query = getQueryParams(args);
 
@@ -190,11 +190,11 @@ PainterPlugin {
     var args = Qt.application.arguments[1];
     var query = getQueryParams(args);
 
-    var sgtk_substancepainter_engine_startup = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP+ '"'
-    var sgtk_substancepainter_engine_python = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON + '"'
+    var sgtk_substancepainter_engine_startup = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP+ '"';
+    var sgtk_substancepainter_engine_python = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON + '"';
     
-    log_debug("Starting tk-substancepainter engine with params: " + sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup)
-    alg.subprocess.start(sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup, onProcessEndedCallback)
+    log_debug("Starting tk-substancepainter engine with params: " + sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup);
+    alg.subprocess.start(sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup, onProcessEndedCallback);
   }
 
   function checkConnection(data) 
@@ -260,7 +260,7 @@ PainterPlugin {
     {
       if (alg.project.isOpen())
       {
-        if (alg.project.needSaving())
+        if (passData.check && alg.project.needSaving())
         {
           unsavedFileDialog.doCommand = doCreate;
           unsavedFileDialog.open();
@@ -288,21 +288,27 @@ PainterPlugin {
 
   function doCreate()
   {
-    var data = passData;
-    alg.project.create(alg.fileIO.localFileToUrl(data["path"]), [], alg.fileIO.localFileToUrl(data["template_path"]), data["project_settings"]);
+    alg.project.create(alg.fileIO.localFileToUrl(passData.path), [], alg.fileIO.localFileToUrl(passData.template_path), passData.project_settings);
     passData = null;
   }
 
-  function openProject(data) 
+  function openProject(data)
   {
     passData = data;
-
     try
     {
-      if (alg.project.isOpen() && alg.project.needSaving())
+      if (alg.project.isOpen())
       {
-        unsavedFileDialog.doCommand = doOpen;
-        unsavedFileDialog.open();
+        if (passData.check && alg.project.needSaving())
+        {
+          unsavedFileDialog.doCommand = doOpen;
+          unsavedFileDialog.open();
+        }
+        else
+        {
+          alg.project.close();
+          doOpen();
+        }
       }
       else
       {
@@ -321,8 +327,7 @@ PainterPlugin {
 
   function doOpen()
   {
-    var url = alg.fileIO.localFileToUrl(passData.path);
-    alg.project.open(url);
+    alg.project.open(alg.fileIO.localFileToUrl(passData.path));
     passData = null;
   }
 
@@ -405,7 +410,7 @@ PainterPlugin {
   {
     try
     {
-      return alg.project.needSaving();
+      return (alg.project.isOpen() && alg.project.needSaving());
     }
     catch (err)
     {

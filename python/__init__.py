@@ -1,1 +1,1 @@
-from . import tk_substancepainter
+from . import tk_substancepainter, win_32_utils

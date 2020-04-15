@@ -137,10 +137,6 @@ class SubstancePainterEngine(Engine):
     Toolkit engine for Substance Painter.
     """
 
-    _DIALOG_PARENT = None
-    _WIN32_SUBSTANCE_MAIN_HWND = None
-    _PROXY_WIN_HWND = None
-
     def __init__(self, *args, **kwargs):
         """
         Engine Constructor
@@ -158,6 +154,43 @@ class SubstancePainterEngine(Engine):
         Represents the DCC app connection
         """
         return self._dcc_app
+    
+    # def show_message(self, msg, level="info"):
+    #     """
+    #     Displays a dialog with the message according to  the severity level
+    #     specified.
+    #     """
+    #     if self._qt_app_central_widget:
+    #         from sgtk.platform.qt5 import QtWidgets, QtGui, QtCore
+    #         level_icon = {"info": QtWidgets.QMessageBox.Information, 
+    #                       "error": QtWidgets.QMessageBox.Critical,
+    #                       "warning": QtWidgets.QMessageBox.Warning}
+
+    #         dlg = QtWidgets.QMessageBox(self._qt_app_central_widget)
+    #         dlg.setIcon(level_icon[level])
+    #         dlg.setText(msg)
+    #         dlg.setWindowTitle("Shotgun Substance Painter Engine")
+    #         dlg.setWindowFlags(dlg.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+    #         dlg.show()
+    #         dlg.exec_()
+
+    # def show_error(self, msg):
+    #     """
+    #     Displays an error dialog message
+    #     """
+    #     self.show_message(msg, level="error")
+
+    # def show_warning(self, msg):
+    #     """
+    #     Displays a warning dialog message
+    #     """
+    #     self.show_message(msg, level="warning")
+
+    # def show_info(self, msg):
+    #     """
+    #     Displays an informative dialog message
+    #     """
+    #     self.show_message(msg, level="info")
 
     def __get_platform_resource_path(self, filename):
         """
@@ -306,7 +339,10 @@ class SubstancePainterEngine(Engine):
             refresh_engine(path, self.context)
 
         if method == "QUIT":
-            self.destroy_engine()
+            if self. _qt_app:
+                self.destroy_engine()
+                self. _qt_app.quit()
+
 
     def pre_app_init(self):
         """
@@ -316,20 +352,23 @@ class SubstancePainterEngine(Engine):
         self.logger.debug("%s: Initializing...", self)
 
         self.tk_substancepainter = self.import_module("tk_substancepainter")
-        self.win_32_utils = self.import_module("win_32_utils")
 
+        self.init_qt_app()
         self.utils = self.tk_substancepainter.utils
+
         port = os.environ['SGTK_SUBSTANCEPAINTER_ENGINE_PORT']
         url = "ws://localhost:%s" % port
+
         engine_client_class = self.tk_substancepainter.application.EngineClient
-        self._dcc_app = engine_client_class(self, parent=self._get_dialog_parent(), url=url)
+        self._dcc_app = engine_client_class(self, parent=self._qt_app, url=url)
 
         # check that we are running an ok version of Substance Painter
         current_os = sys.platform
         if current_os not in ["darwin", "win32", "linux64"]:
             raise tank.TankError("The current platform is not supported!"
-                                " Supported platforms "
-                                "are Mac, Linux 64 and Windows 64.")
+                                 " Supported platforms "
+                                 "are Mac, Linux 64 and Windows 64.")
+
 
         painter_version_str = self._dcc_app.get_application_version()
         painter_version = float(".".join(painter_version_str.split(".")[:2]))
@@ -409,6 +448,7 @@ class SubstancePainterEngine(Engine):
             # create our menu handler
             self._menu_generator = self.tk_substancepainter.MenuGenerator(
                 self, self._menu_name)
+
             self._qt_app.setActiveWindow(self._menu_generator.menu_handle)
             self._menu_generator.create_menu(disabled=disabled)
             return True
@@ -426,29 +466,28 @@ class SubstancePainterEngine(Engine):
         """
         Initializes if not done already the QT Application for the engine.
         """
-        from sgtk.platform.qt import QtGui
+        from sgtk.platform.qt5 import QtWidgets, QtGui
         
-        if not QtGui.QApplication.instance():
-            app_name = "Shotgun Toolkit for Substance Painter"
-            self._qt_app = QtGui.QApplication([app_name])
+        if not QtWidgets.QApplication.instance():
+            self._qt_app = QtWidgets.QApplication(sys.argv)
             self._qt_app.setWindowIcon(QtGui.QIcon(self.icon_256))
-            self._qt_app.setQuitOnLastWindowClosed(False)
 
-            if sys.platform == "win32":
-                # for windows, we create a proxy window parented to the
-                # main application window that we can then set as the owner
-                # for all Toolkit dialogs
-                self._DIALOG_PARENT = self._win32_get_proxy_window()
-            else:
-                self._DIALOG_PARENT = QtGui.QApplication.activeWindow()
+            self._qt_app_main_window = QtWidgets.QMainWindow()
+            self._qt_app_central_widget = QtWidgets.QWidget()
+            self._qt_app_main_window.setCentralWidget(self._qt_app_central_widget)
+            self._qt_app.setQuitOnLastWindowClosed(False)
     
             # Make the QApplication use the dark theme. Must be called after the QApplication is instantiated
             self._initialize_dark_look_and_feel()
     
+        else:
+            self._qt_app = QtWidgets.QApplication.instance()
+
     def post_app_init(self):
         """
         Called when all apps have initialized
         """
+
         # for some reason this engine command get's lost so we add it back
         self.__register_reload_command()
 
@@ -560,124 +599,14 @@ class SubstancePainterEngine(Engine):
         """
         self.logger.debug("%s: Destroying...", self)
 
-    def _win32_get_substance_main_hwnd(self):
-        """
-        Windows specific method to find the main Substance Painter window
-        handle (HWND)
-        """
-        if not self._WIN32_SUBSTANCE_MAIN_HWND:
-            found_hwnds = self.win_32_utils.win_32_api.find_windows(
-                class_name="Qt5QWindowIcon",
-                window_text="Substance Painter",
-                stop_if_found=True,
-            )
-
-            if found_hwnds:
-                self._WIN32_SUBSTANCE_MAIN_HWND = found_hwnds[0]
-        return self._WIN32_SUBSTANCE_MAIN_HWND
-
-    def _win32_get_proxy_window(self):
-        """
-        Windows-specific method to get the proxy window that will 'own' all
-        Toolkit dialogs.  This will be parented to the main Substance Painter
-        application.
-
-        :returns: A QWidget that has been parented to Substance Painter's window.
-        """
-        # Get the main Substance Painter window:
-        sp_hwnd = self._win32_get_substance_main_hwnd()
-        win32_proxy_win = None
-        proxy_win_hwnd = None
-
-        if sp_hwnd:
-            from sgtk.platform.qt import QtGui, QtCore
-
-            # Create the proxy QWidget.
-            win32_proxy_win = QtGui.QWidget()
-            window_title = "Shotgun Toolkit Parent Widget"
-            win32_proxy_win.setWindowTitle(window_title)
-
-            # We have to take different approaches depending on whether
-            # we're using Qt4 (PySide) or Qt5 (PySide2). The functionality
-            # needed to turn a Qt5 WId into an HWND is not exposed in PySide2,
-            # so we can't do what we did below for Qt4.
-            if QtCore.__version__.startswith("4."):
-                proxy_win_hwnd = self.win_32_utils.win_32_api.qwidget_winid_to_hwnd(
-                    win32_proxy_win.winId(),
-                )
-            else:
-                # With PySide2, we're required to look up our proxy parent
-                # widget's HWND the hard way, following the same logic used
-                # to find Substance Painter's main window. To do that, we actually have
-                # to show our widget so that Windows knows about it. We can make
-                # it effectively invisible if we zero out its size, so we do that,
-                # show the widget, and then look up its HWND by window title before
-                # hiding it.
-                win32_proxy_win.setGeometry(0, 0, 0, 0)
-                win32_proxy_win.show()
-
-                try:
-                    proxy_win_hwnd_found = self.win_32_utils.win_32_api.find_windows(
-                        stop_if_found=True,
-                        class_name="Qt5QWindowIcon",
-                        window_text="Shotgun Toolkit Parent Widget",
-                        process_id=os.getpid(),
-                    )
-                finally:
-                    win32_proxy_win.hide()
-
-                if proxy_win_hwnd_found:
-                    proxy_win_hwnd = proxy_win_hwnd_found[0]
-        else:
-            self.logger.debug(
-                "Unable to determine the HWND of Substance Painter itself. This means "
-                "that we can't properly setup window parenting for Toolkit apps."
-            )
-
-        # Parent to the Photoshop application window if we found everything
-        # we needed. If we didn't find our proxy window for some reason, we
-        # will return None below. In that case, we'll just end up with no
-        # window parenting, but apps will still launch.
-        if proxy_win_hwnd is None:
-            self.logger.warning(
-                "Unable setup window parenting properly. Dialogs shown will "
-                "not be parented to Photoshop, but they will still function "
-                "properly otherwise."
-            )
-        else:
-            # Set the window style/flags. We don't need or want our Python
-            # dialogs to notify the Photoshop application window when they're
-            # opened or closed, so we'll disable that behavior.
-            win_ex_style = self.win_32_utils.win_32_api.GetWindowLong(
-                proxy_win_hwnd,
-                self.win_32_utils.win_32_api.GWL_EXSTYLE,
-            )
-
-            self.win_32_utils.win_32_api.SetWindowLong(
-                proxy_win_hwnd,
-                self.win_32_utils.win_32_api.GWL_EXSTYLE, 
-                win_ex_style | self.win_32_utils.win_32_api.WS_EX_NOPARENTNOTIFY,
-            )
-            self.win_32_utils.win_32_api.SetParent(proxy_win_hwnd, sp_hwnd)
-            self._PROXY_WIN_HWND = proxy_win_hwnd
-
-        return win32_proxy_win
 
     def _get_dialog_parent(self):
         """
         Get the QWidget parent for all dialogs created through
         show_dialog & show_modal.
         """
+        return self._qt_app_main_window
 
-        """
-        Get the QWidget parent for all dialogs created through
-        show_dialog & show_modal.
-        """
-        
-        if not self._DIALOG_PARENT:
-            self.init_qt_app()
-            
-        return self._DIALOG_PARENT
 
     @property
     def has_ui(self):
