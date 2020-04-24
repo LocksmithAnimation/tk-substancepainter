@@ -339,9 +339,9 @@ class SubstancePainterEngine(Engine):
         if self.get_setting("use_sgtk_as_menu_name", False):
             self._menu_name = "Sgtk"
 
-        if painter_version < 2018.3:
+        if (painter_version > 2017.1 and painter_version < 2018.3) or painter_version < 6.1:
             msg = ("Shotgun integration is not compatible with Substance Painter versions"
-                   " older than 2.3.0")
+                   " older than 2.3.0 (found version {})".format(painter_version))
             raise tank.TankError(msg)
 
         if painter_version > 2018.3:
