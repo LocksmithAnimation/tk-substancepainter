@@ -45,7 +45,6 @@ SHOW_COMP_DLG = "SGTK_COMPATIBILITY_DIALOG_SHOWN"
 #     t = time.asctime(time.localtime())
 #     print("%s - Shotgun Warning | Substance Painter engine | %s " % (t, msg))
 
-
 # def display_info(msg):
 #     t = time.asctime(time.localtime())
 #     print("%s - Shotgun Info | Substance Painter engine | %s " % (t, msg))
