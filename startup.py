@@ -251,6 +251,11 @@ class SubstancePainterLauncher(SoftwareLauncher):
 
         # ensure scripts are up to date on the substance painter side
 
+        # Grab the name of the executable. This is for the case when we're 
+        # running the Substance Painter Beta, so we'll put the plug-ins into the 
+        # correct place.
+        exec_name = os.path.splitext(os.path.basename(exec_path))[0]
+
         # Platform-specific plug-in paths
 
         if sys.platform == 'win32':
@@ -261,11 +266,11 @@ class SubstancePainterLauncher(SoftwareLauncher):
             path_buffer= ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
             ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, path_buffer)
 
-            user_scripts_path = path_buffer.value + r"\Allegorithmic\Substance Painter\plugins"
+            user_scripts_path = path_buffer.value + r"\Allegorithmic\{}\plugins".format(exec_name)
 
         else:
             user_scripts_path = (
-                os.path.expanduser(r"~/Documents/Allegorithmic/Substance Painter/plugins")
+                os.path.expanduser(r"~/Documents/Allegorithmic/{}/plugins".format(exec_name))
             )
 
         ensure_scripts_up_to_date(resources_plugins_path, user_scripts_path)
