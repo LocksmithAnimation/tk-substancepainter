@@ -95,7 +95,7 @@ def refresh_engine(scene_name, prev_context):
         # and construct the new context for this path:
         tk = tank.tank_from_path(new_path)
         ctx = tk.context_from_path(new_path, prev_context)
-    except tank.TankError, e:
+    except tank.TankError as e:
         try:
             # could not detect context from path, will use the project context
             # for menus if it exists
@@ -109,7 +109,7 @@ def refresh_engine(scene_name, prev_context):
                        "\n" % engine.context.project.get('name'))
             engine.show_warning(message)
 
-        except tank.TankError, e:
+        except tank.TankError as e:
             (exc_type, exc_value, exc_traceback) = sys.exc_info()
             message = ""
             message += "Shotgun Substance Painter Engine cannot be started:.\n"
@@ -315,7 +315,8 @@ class SubstancePainterEngine(Engine):
         self.logger.debug("%s: Initializing...", self)
 
         self.tk_substancepainter = self.import_module("tk_substancepainter")
-        self.win_32_utils = self.import_module("win_32_utils")
+        win_32_utils = self.import_module("win_32_utils")
+        self.win_32_api = win_32_utils.win_32_api
 
         self.utils = self.tk_substancepainter.utils
         port = os.environ['SGTK_SUBSTANCEPAINTER_ENGINE_PORT']
@@ -498,7 +499,7 @@ class SubstancePainterEngine(Engine):
         # Build a dictionary mapping app instance names to dictionaries of
         # commands they registered with the engine.
         app_instance_commands = {}
-        for (cmd_name, value) in self.commands.iteritems():
+        for (cmd_name, value) in self.commands.items():
             app_instance = value["properties"].get("app")
             if app_instance:
                 # Add entry 'command name: command function' to the command
@@ -565,10 +566,10 @@ class SubstancePainterEngine(Engine):
         handle (HWND)
         """
         if not self._WIN32_SUBSTANCE_MAIN_HWND:
-            found_hwnds = self.win_32_utils.win_32_api.find_windows(
+            found_hwnds = self.win_32_api.find_windows(
                 class_name="Qt5QWindowIcon",
-                window_text="Substance Painter",
-                stop_if_found=True,
+                window_text="License",
+                stop_if_found=False,
             )
 
             if found_hwnds:
@@ -601,7 +602,7 @@ class SubstancePainterEngine(Engine):
             # needed to turn a Qt5 WId into an HWND is not exposed in PySide2,
             # so we can't do what we did below for Qt4.
             if QtCore.__version__.startswith("4."):
-                proxy_win_hwnd = self.win_32_utils.win_32_api.qwidget_winid_to_hwnd(
+                proxy_win_hwnd = self.win_32_api.qwidget_winid_to_hwnd(
                     win32_proxy_win.winId(),
                 )
             else:
@@ -616,9 +617,8 @@ class SubstancePainterEngine(Engine):
                 win32_proxy_win.show()
 
                 try:
-                    proxy_win_hwnd_found = self.win_32_utils.win_32_api.find_windows(
+                    proxy_win_hwnd_found = self.win_32_api.find_windows(
                         stop_if_found=True,
-                        class_name="Qt5QWindowIcon",
                         window_text="Shotgun Toolkit Parent Widget",
                         process_id=os.getpid(),
                     )
@@ -647,17 +647,17 @@ class SubstancePainterEngine(Engine):
             # Set the window style/flags. We don't need or want our Python
             # dialogs to notify the Photoshop application window when they're
             # opened or closed, so we'll disable that behavior.
-            win_ex_style = self.win_32_utils.win_32_api.GetWindowLong(
+            win_ex_style = self.win_32_api.GetWindowLong(
                 proxy_win_hwnd,
-                self.win_32_utils.win_32_api.GWL_EXSTYLE,
+                self.win_32_api.GWL_EXSTYLE,
             )
 
-            self.win_32_utils.win_32_api.SetWindowLong(
+            self.win_32_api.SetWindowLong(
                 proxy_win_hwnd,
-                self.win_32_utils.win_32_api.GWL_EXSTYLE, 
-                win_ex_style | self.win_32_utils.win_32_api.WS_EX_NOPARENTNOTIFY,
+                self.win_32_api.GWL_EXSTYLE, 
+                win_ex_style | self.win_32_api.WS_EX_NOPARENTNOTIFY,
             )
-            self.win_32_utils.win_32_api.SetParent(proxy_win_hwnd, sp_hwnd)
+            self.win_32_api.SetParent(proxy_win_hwnd, sp_hwnd)
             self._PROXY_WIN_HWND = proxy_win_hwnd
 
         return win32_proxy_win
@@ -742,7 +742,7 @@ class SubstancePainterEngine(Engine):
                 # the original dialog list.
                 self.logger.debug("Closing dialog %s.", dialog_window_title)
                 dialog.close()
-            except Exception, exception:
+            except Exception as exception:
                 traceback.print_exc()
                 self.logger.error("Cannot close dialog %s: %s",
                                   dialog_window_title, exception)

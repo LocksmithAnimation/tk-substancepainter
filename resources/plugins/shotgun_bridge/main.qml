@@ -194,7 +194,7 @@ PainterPlugin {
     var sgtk_substancepainter_engine_python = '"' + query.SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON + '"';
     
     log_debug("Starting tk-substancepainter engine with params: " + sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup);
-    alg.subprocess.start(sgtk_substancepainter_engine_python + " " + sgtk_substancepainter_engine_startup, onProcessEndedCallback);
+    alg.subprocess.start("python " + sgtk_substancepainter_engine_startup, onProcessEndedCallback);
   }
 
   function checkConnection(data) 

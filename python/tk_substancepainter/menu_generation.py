@@ -51,11 +51,11 @@ class MenuGenerator(object):
         pos = QtGui.QCursor.pos() if pos is None else QtCore.QPoint(pos[0],
                                                                     pos[1]) 
         qApp = QtWidgets.QApplication.instance()
-        #qApp.setWindowState(QtCore.Qt.WindowActive)
+        qApp.setWindowState(QtCore.Qt.WindowActive)
 
         self.menu_handle.activateWindow()
         self.menu_handle.raise_()
-        self.menu_handle.exec_(pos)
+        self.menu_handle.popup(pos)
     
     def create_menu_test(self, disabled=False):
         #Test for icon based menu. Needs work.

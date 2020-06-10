@@ -66,7 +66,7 @@ class Client(QtCore.QObject):
 
             loop = QtCore.QEventLoop()
 
-            data = None
+            self.send_and_receive.data = None
 
             def await_for_response(result):
                 self.send_and_receive.data = result
@@ -89,18 +89,6 @@ class Client(QtCore.QObject):
 
         # connect to server
         self.connect_to_server()
-
-    def log_info(self, message):
-        pass
-
-    def log_debug(self, message):
-        pass
-
-    def log_warning(self, message):
-        pass
-
-    def log_error(self, message):
-        pass
 
     def connect_to_server(self):
         self.engine.log_debug("Client start connection | %s " % QtCore.QUrl(self.url))
@@ -145,13 +133,13 @@ class Client(QtCore.QObject):
         message_id = jsonData.get("id")
 
         # requesting data
-        if jsonData.has_key("method"):
+        if "method" in jsonData:
             # self.engine.log_debug("client: request detected: %s" % (message))
             method = jsonData.get("method")
             params = jsonData.get("params")
             self.engine.process_request(method, **params)
 
-        if jsonData.has_key("result"):
+        if "result" in jsonData:
             # self.engine.log_debug("client: result detected: %s" % (message))
             if message_id in self.callbacks:
                 # self.engine.log_debug(
