@@ -35,9 +35,7 @@ class MenuGenerator(object):
         self._engine = engine
         self._menu_name = menu_name
         self._dialogs = []
-        
-        self._widget = QtWidgets.QWidget()
-        self._handle = QtWidgets.QMenu(self._menu_name, self._widget)
+        self._handle = QtWidgets.QMenu(self._menu_name, engine._get_dialog_parent())
         self._ui_cache = []
 
     @property
@@ -50,8 +48,8 @@ class MenuGenerator(object):
     def show(self, pos=None):
         pos = QtGui.QCursor.pos() if pos is None else QtCore.QPoint(pos[0],
                                                                     pos[1]) 
-        qApp = QtWidgets.QApplication.instance()
-        qApp.setWindowState(QtCore.Qt.WindowActive)
+        # qApp = QtWidgets.QApplication.instance()
+        # qApp.setWindowState(QtCore.Qt.WindowActive)
 
         self.menu_handle.activateWindow()
         self.menu_handle.raise_()

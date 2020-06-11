@@ -565,8 +565,13 @@ class SubstancePainterEngine(Engine):
         Windows specific method to find the main Substance Painter window
         handle (HWND)
         """
+        try:
+            parent_process = os.getppid()
+        except AttributeError:
+            parent_process = None # To Do: find some way to do this in Python2
         if not self._WIN32_SUBSTANCE_MAIN_HWND:
             found_hwnds = self.win_32_api.find_windows(
+                process_id=parent_process,
                 class_name="Qt5QWindowIcon",
                 window_text="License",
                 stop_if_found=False,
