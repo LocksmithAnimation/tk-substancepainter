@@ -35,44 +35,10 @@ class MenuGenerator(object):
         self._engine = engine
         self._menu_name = menu_name
         self._dialogs = []
-        self._handle = QtWidgets.QMenu(self._menu_name, engine._get_dialog_parent())
+        self.menu_handle = QtWidgets.QMenu(self._menu_name, None)
         self._ui_cache = []
 
-    @property
-    def menu_handle(self):
-        return self._handle
-
-    def hide(self):
-        self.menu_handle.hide()
-
-    def show(self, pos=None):
-        pos = QtGui.QCursor.pos() if pos is None else QtCore.QPoint(pos[0],
-                                                                    pos[1]) 
-        # qApp = QtWidgets.QApplication.instance()
-        # qApp.setWindowState(QtCore.Qt.WindowActive)
-
-        self.menu_handle.activateWindow()
-        self.menu_handle.raise_()
-        self.menu_handle.popup(pos)
-    
-    def create_menu_test(self, disabled=False):
-        #Test for icon based menu. Needs work.
-        self.menu_handle.clear()
-
-        if disabled:
-            self.menu_handle.addMenu("Sgtk is disabled.")
-            return
-        
-        menu_items = []
-        for (cmd_name, cmd_details) in self._engine.commands.items():
-            menu_items.append(AppCommand(cmd_name, self, cmd_details))
-
-        menu_items.sort(key=operator.attrgetter("app_name", "name"))
-        for cmd in menu_items:
-            self._add_menu_item("", self.menu_handle, cmd.callback, cmd.properties)
-
-
-    def create_menu(self, disabled=False):
+    def create_menu(self, *args):
         """
         Render the entire Shotgun menu.
         In order to have commands enable/disable themselves based on the
@@ -80,10 +46,6 @@ class MenuGenerator(object):
         """
 
         self.menu_handle.clear()
-
-        if disabled:
-            self.menu_handle.addMenu("Sgtk is disabled.")
-            return
 
         # now add the context item on top of the main menu
         self._context_menu = self._add_context_menu()
@@ -137,12 +99,6 @@ class MenuGenerator(object):
 
         # now add all apps to main menu
         self._add_app_menu(commands_by_app)
-
-        # add menu divider
-        self._add_divider(self.menu_handle)
-
-        # add menu divider
-        self._add_menu_item("Exit Menu", self.menu_handle, self.menu_handle.hide)
 
     def _add_divider(self, parent_menu):
         divider = QtWidgets.QAction(parent_menu)

@@ -1,0 +1,35 @@
+QWidget {
+    font-size: 11px;
+}
+
+QGroupBox {
+    border: 2px solid rgb(40,40,40);
+    border-radius: 0px;
+    margin: 0em;
+}
+
+QGroupBox::title {
+    color: rgb(200,200,200);
+}
+
+QAbstractItemView {
+    background-color: rgb(40, 40, 40);
+}
+
+/*
+QPushButton[flat=true] {
+    padding-right: 3px;
+    padding-left: 3px;
+    background: transparent;
+    border: none;
+    border-radius: 0px;
+}
+*/
+
+QScrollBar::vertical {
+    width: 12px;
+}
+
+SearchWidget {
+    padding: 4px;
+}

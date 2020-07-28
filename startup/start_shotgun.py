@@ -17,6 +17,7 @@ import os
 import sys
 import traceback
 
+import sgtk
 
 __author__ = "Diego Garcia Huerta"
 __email__ = "diegogh2000@gmail.com"
@@ -129,8 +130,21 @@ def setup_environment():
     if SGTK_SUBSTANCEPAINTER_SGTK_MODULE_PATH and SGTK_SUBSTANCEPAINTER_SGTK_MODULE_PATH not in sys.path:
         sys.path.insert(0, SGTK_SUBSTANCEPAINTER_SGTK_MODULE_PATH)
 
-
-if __name__ == "__main__":
-    # Fire up Toolkit and the environment engine when there's time.
+plugin_widgets = []
+def start_plugin():
+    """This method is called when the plugin is started."""
     setup_environment()
     start_toolkit()
+
+
+def close_plugin():
+    import substance_painter
+    """This method is called when the plugin is stopped."""
+    engine = sgtk.platform.current_engine()
+    if engine:
+        engine.destroy()
+
+
+
+if __name__ == "__main__":
+    start_plugin()

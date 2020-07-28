@@ -27,6 +27,8 @@ from tank.platform import Engine
 from tank.platform.constants import SHOTGUN_ENGINE_NAME
 from tank.platform.constants import TANK_ENGINE_INIT_HOOK_NAME
 
+import substance_painter
+
 
 __author__ = "Diego Garcia Huerta"
 __contact__ = "https://www.linkedin.com/in/diegogh/"
@@ -119,7 +121,7 @@ def refresh_engine(scene_name, prev_context):
             message += "\n".join(traceback.format_tb(exc_traceback))
 
             # disabled menu, could not get project context
-            engine.create_shotgun_menu(disabled=True)
+            engine.create_shotgun_menu()
             engine.show_error(message)
             return
     
@@ -148,6 +150,8 @@ class SubstancePainterEngine(Engine):
         self._dcc_app = None
         self._menu_generator = None
         self.utils = None
+        self.dialog_killer = None
+        self.widgets = []
 
         Engine.__init__(self, *args, **kwargs)
 
@@ -269,11 +273,11 @@ class SubstancePainterEngine(Engine):
                 "version: "unknown"
             }
         """
-
         host_info = {"name": "SubstancePainter", "version": "unknown"}
         try:
-            painter_version = self._dcc_app.get_application_version()
-            host_info["version"] = painter_version
+            from application_core.windows import WindowsFileDetails
+            details = WindowsFileDetails(sys.executable)
+            host_info["version"] = ".".join(details.file_version)
         except:
             pass
         return host_info
@@ -315,14 +319,13 @@ class SubstancePainterEngine(Engine):
         self.logger.debug("%s: Initializing...", self)
 
         self.tk_substancepainter = self.import_module("tk_substancepainter")
-        win_32_utils = self.import_module("win_32_utils")
-        self.win_32_api = win_32_utils.win_32_api
 
         self.utils = self.tk_substancepainter.utils
+        self.dialog_killer = self.utils.DialogKiller()
         port = os.environ['SGTK_SUBSTANCEPAINTER_ENGINE_PORT']
         url = "ws://localhost:%s" % port
-        engine_client_class = self.tk_substancepainter.application.EngineClient
-        self._dcc_app = engine_client_class(self, parent=self._get_dialog_parent(), url=url)
+        #engine_client_class = self.tk_substancepainter.application.EngineClient
+        #self._dcc_app = engine_client_class(self, parent=self._get_dialog_parent(), url=url)
 
         # check that we are running an ok version of Substance Painter
         current_os = sys.platform
@@ -331,7 +334,7 @@ class SubstancePainterEngine(Engine):
                                 " Supported platforms "
                                 "are Mac, Linux 64 and Windows 64.")
 
-        painter_version_str = self._dcc_app.get_application_version()
+        painter_version_str = self.host_info["version"]
         painter_version = float(".".join(painter_version_str.split(".")[:2]))
 
         # default menu name is Shotgun but this can be overriden
@@ -340,12 +343,12 @@ class SubstancePainterEngine(Engine):
         if self.get_setting("use_sgtk_as_menu_name", False):
             self._menu_name = "Sgtk"
 
-        if (painter_version > 2017.1 and painter_version < 2018.3) or painter_version < 6.1:
+        if painter_version < 6.2:
             msg = ("Shotgun integration is not compatible with Substance Painter versions"
                    " older than 2.3.0 (found version {})".format(painter_version))
             raise tank.TankError(msg)
 
-        if painter_version > 2018.3:
+        if painter_version > 6.3:
             # show a warning that this version of Substance Painter isn't yet fully tested
             # with Shotgun:
             msg = ("The Shotgun Pipeline Toolkit has not yet been fully "
@@ -395,24 +398,56 @@ class SubstancePainterEngine(Engine):
                 )
                 os.environ["SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT"] = "1"
 
+    def _create_dialog(self, title, bundle, widget, parent):
+        dialog = super(SubstancePainterEngine, self)._create_dialog(title, bundle, widget, parent)
+        self._apply_external_styleshet(self, dialog)
+        qss = dialog.styleSheet()
+        qss = qss.replace("{{ENGINE_ROOT_PATH}}", self.disk_location)
+        dialog.setStyleSheet(qss)
+        dialog.update()
+        return dialog
 
-    def create_shotgun_menu(self, disabled=False):
+    def show_dialog(self, title, bundle, widget_class, *args, **kwargs):
+        if not self.has_ui:
+            self.log_error(
+                "Sorry, this environment does not support UI display! Cannot show "
+                "the requested window '%s'." % title
+            )
+            return None
+
+        # create the dialog:
+        dialog, widget = self._create_dialog_with_widget(
+            title, bundle, widget_class, *args, **kwargs
+        )
+        # show the dialog
+        dock_widget = substance_painter.ui.add_dock_widget(dialog)
+        #dock_widget.topLevelChanged.connect(self.dialog_killer.dock_vis)
+        dock_widget.setFloating(True)
+        dock_widget.show()
+        dock_widget.installEventFilter(self.utils.CheckFilter(dock_widget))
+        self.widgets.append(dock_widget)
+
+        # lastly, return the instantiated widget
+        return widget
+
+    def _on_dialog_closed(self, dlg):
+        super(SubstancePainterEngine, self)._on_dialog_closed(dlg)
+        print("closed")
+
+    def create_shotgun_menu(self):
         """
         Creates the main shotgun menu in substancepainter.
         Note that this only creates the menu, not the child actions
         :return: bool
         """
-
-        # only create the shotgun menu if not in batch mode and menu doesn't
-        # already exist
         if self.has_ui:
-            # create our menu handler
-            self._menu_generator = self.tk_substancepainter.MenuGenerator(
-                self, self._menu_name)
-            self._qt_app.setActiveWindow(self._menu_generator.menu_handle)
-            self._menu_generator.create_menu(disabled=disabled)
+            if not self._menu_generator:
+                # create our menu handler
+                self._menu_generator = self.tk_substancepainter.MenuGenerator(
+                    self, self._menu_name)
+                menu_widget = substance_painter.ui.add_menu(self._menu_generator.menu_handle)
+            self._menu_generator.create_menu()
             return True
-
         return False
 
     def display_menu(self, pos=None):
@@ -421,30 +456,21 @@ class SubstancePainterEngine(Engine):
         """
         if self._menu_generator:
             self._menu_generator.show(pos)
-
-    def init_qt_app(self):
-        """
-        Initializes if not done already the QT Application for the engine.
-        """
-        from sgtk.platform.qt import QtGui
-        
-        if not QtGui.QApplication.instance():
-            app_name = "Shotgun Toolkit for Substance Painter"
-            self._qt_app = QtGui.QApplication([app_name])
-            self._qt_app.setWindowIcon(QtGui.QIcon(self.icon_256))
-            self._qt_app.setQuitOnLastWindowClosed(False)
-
-            if sys.platform == "win32":
-                # for windows, we create a proxy window parented to the
-                # main application window that we can then set as the owner
-                # for all Toolkit dialogs
-                self._DIALOG_PARENT = self._win32_get_proxy_window()
-            else:
-                self._DIALOG_PARENT = QtGui.QApplication.activeWindow()
     
-            # Make the QApplication use the dark theme. Must be called after the QApplication is instantiated
-            self._initialize_dark_look_and_feel()
-    
+    def _get_dialog_parent(self):
+        """
+        Get the QWidget parent for all dialogs created through :meth:`show_dialog` :meth:`show_modal`.
+
+        Can be overriden in derived classes to return the QWidget to be used as the parent
+        for all TankQDialog's.
+
+        :return: QT Parent window (:class:`PySide.QtGui.QWidget`)
+        """
+        # By default, this will return the QApplication's active window:
+
+        #return substance_painter.ui.get_main_window()
+        return None
+
     def post_app_init(self):
         """
         Called when all apps have initialized
@@ -459,16 +485,13 @@ class SubstancePainterEngine(Engine):
         self.create_shotgun_menu()
 
         # Let the app know we are ready for action!
-        self._dcc_app.broadcast_event("ENGINE_READY")
+        #self._dcc_app.broadcast_event("ENGINE_READY")
 
         # make sure we setup this engine as the current engine for the platform
         tank.platform.engine.set_current_engine(self)
 
         # emit an engine started event
         self.sgtk.execute_core_hook(TANK_ENGINE_INIT_HOOK_NAME, engine=self)
-
-        # initalize qt loop
-        self._qt_app.exec_()
 
     def post_context_change(self, old_context, new_context):
         """
@@ -559,129 +582,11 @@ class SubstancePainterEngine(Engine):
         Cleanup after ourselves
         """
         self.logger.debug("%s: Destroying...", self)
-
-    def _win32_get_substance_main_hwnd(self):
-        """
-        Windows specific method to find the main Substance Painter window
-        handle (HWND)
-        """
-        try:
-            parent_process = os.getppid()
-        except AttributeError:
-            parent_process = None # To Do: find some way to do this in Python2
-        if not self._WIN32_SUBSTANCE_MAIN_HWND:
-            found_hwnds = self.win_32_api.find_windows(
-                process_id=parent_process,
-                class_name="Qt5QWindowIcon",
-                window_text="License",
-                stop_if_found=False,
-            )
-
-            if found_hwnds:
-                self._WIN32_SUBSTANCE_MAIN_HWND = found_hwnds[0]
-        return self._WIN32_SUBSTANCE_MAIN_HWND
-
-    def _win32_get_proxy_window(self):
-        """
-        Windows-specific method to get the proxy window that will 'own' all
-        Toolkit dialogs.  This will be parented to the main Substance Painter
-        application.
-
-        :returns: A QWidget that has been parented to Substance Painter's window.
-        """
-        # Get the main Substance Painter window:
-        sp_hwnd = self._win32_get_substance_main_hwnd()
-        win32_proxy_win = None
-        proxy_win_hwnd = None
-
-        if sp_hwnd:
-            from sgtk.platform.qt import QtGui, QtCore
-
-            # Create the proxy QWidget.
-            win32_proxy_win = QtGui.QWidget()
-            window_title = "Shotgun Toolkit Parent Widget"
-            win32_proxy_win.setWindowTitle(window_title)
-
-            # We have to take different approaches depending on whether
-            # we're using Qt4 (PySide) or Qt5 (PySide2). The functionality
-            # needed to turn a Qt5 WId into an HWND is not exposed in PySide2,
-            # so we can't do what we did below for Qt4.
-            if QtCore.__version__.startswith("4."):
-                proxy_win_hwnd = self.win_32_api.qwidget_winid_to_hwnd(
-                    win32_proxy_win.winId(),
-                )
-            else:
-                # With PySide2, we're required to look up our proxy parent
-                # widget's HWND the hard way, following the same logic used
-                # to find Substance Painter's main window. To do that, we actually have
-                # to show our widget so that Windows knows about it. We can make
-                # it effectively invisible if we zero out its size, so we do that,
-                # show the widget, and then look up its HWND by window title before
-                # hiding it.
-                win32_proxy_win.setGeometry(0, 0, 0, 0)
-                win32_proxy_win.show()
-
-                try:
-                    proxy_win_hwnd_found = self.win_32_api.find_windows(
-                        stop_if_found=True,
-                        window_text="Shotgun Toolkit Parent Widget",
-                        process_id=os.getpid(),
-                    )
-                finally:
-                    win32_proxy_win.hide()
-
-                if proxy_win_hwnd_found:
-                    proxy_win_hwnd = proxy_win_hwnd_found[0]
-        else:
-            self.logger.debug(
-                "Unable to determine the HWND of Substance Painter itself. This means "
-                "that we can't properly setup window parenting for Toolkit apps."
-            )
-
-        # Parent to the Photoshop application window if we found everything
-        # we needed. If we didn't find our proxy window for some reason, we
-        # will return None below. In that case, we'll just end up with no
-        # window parenting, but apps will still launch.
-        if proxy_win_hwnd is None:
-            self.logger.warning(
-                "Unable setup window parenting properly. Dialogs shown will "
-                "not be parented to Photoshop, but they will still function "
-                "properly otherwise."
-            )
-        else:
-            # Set the window style/flags. We don't need or want our Python
-            # dialogs to notify the Photoshop application window when they're
-            # opened or closed, so we'll disable that behavior.
-            win_ex_style = self.win_32_api.GetWindowLong(
-                proxy_win_hwnd,
-                self.win_32_api.GWL_EXSTYLE,
-            )
-
-            self.win_32_api.SetWindowLong(
-                proxy_win_hwnd,
-                self.win_32_api.GWL_EXSTYLE, 
-                win_ex_style | self.win_32_api.WS_EX_NOPARENTNOTIFY,
-            )
-            self.win_32_api.SetParent(proxy_win_hwnd, sp_hwnd)
-            self._PROXY_WIN_HWND = proxy_win_hwnd
-
-        return win32_proxy_win
-
-    def _get_dialog_parent(self):
-        """
-        Get the QWidget parent for all dialogs created through
-        show_dialog & show_modal.
-        """
-
-        """
-        Get the QWidget parent for all dialogs created through
-        show_dialog & show_modal.
-        """
-        
-        if not self._DIALOG_PARENT:
-            self.init_qt_app()
-            
-        return self._DIALOG_PARENT
+        if self._menu_generator:
+            #self._menu_generator.menu_handle.clear()
+            substance_painter.ui.delete_ui_element(self._menu_generator.menu_handle.menuAction())
+            # menu_bar = substance_painter.ui.get_main_window().menuBar()
+            # menu_bar.removeAction(self._menu_generator.menu_handle.menuAction())
 
     @property
     def has_ui(self):
@@ -692,9 +597,8 @@ class SubstancePainterEngine(Engine):
 
     def _emit_log_message(self, handler, record):
         """
-        Called by the engine to log messages.
-        All log messages from the toolkit logging namespace will be passed to
-        this method.
+        Called by the engine to log messages in Maya script editor.
+        All log messages from the toolkit logging namespace will be passed to this method.
 
         :param handler: Log handler that this message was dispatched from.
                         Its default format is "[levelname basename] message".
@@ -712,21 +616,17 @@ class SubstancePainterEngine(Engine):
             formatter = logging.Formatter("Shotgun %(basename)s: %(message)s")
 
         msg = formatter.format(record)
-        # Select Substance Painter display function to use according to the logging
-        # record level.
-        if self.app:
-            if record.levelno >= logging.ERROR:
-                fct = self.app.log_error
-            elif record.levelno >= logging.WARNING:
-                fct = self.app.log_warning
-            elif record.levelno >= logging.INFO:
-                fct = self.app.log_info
-            else:
-                fct = self.app.log_debug
 
-            # Display the message in Substance Painter script editor in a thread safe manner.
-            self.async_execute_in_main_thread(fct, msg)
+        # Select Maya display function to use according to the logging record level.
+        if record.levelno < logging.WARNING:
+            fct = substance_painter.logging.info
+        elif record.levelno < logging.ERROR:
+            fct = substance_painter.logging.warning
+        else:
+            fct = substance_painter.logging.error
 
+        # Display the message in Maya script editor in a thread safe manner.
+        self.async_execute_in_main_thread(fct, msg)
 
     def close_windows(self):
         """

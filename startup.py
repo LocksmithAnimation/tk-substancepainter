@@ -197,6 +197,15 @@ class SubstancePainterLauncher(SoftwareLauncher):
         """
         required_env = {}
 
+        # Run the engine's userSetup.py file when Clarisse starts up
+        # by appending it to the env PYTHONPATH.
+        sgtk.util.append_path_to_env_var(
+            "SUBSTANCE_PAINTER_PLUGINS_PATH", self.disk_location
+        )
+        required_env["SUBSTANCE_PAINTER_PLUGINS_PATH"] = os.environ[
+            "SUBSTANCE_PAINTER_PLUGINS_PATH"
+        ]
+
         resources_plugins_path = os.path.join(
             self.disk_location, "resources", "plugins"
         )
@@ -273,7 +282,7 @@ class SubstancePainterLauncher(SoftwareLauncher):
                 os.path.expanduser(r"~/Documents/Allegorithmic/{}/plugins".format(exec_name))
             )
 
-        ensure_scripts_up_to_date(resources_plugins_path, user_scripts_path)
+        # ensure_scripts_up_to_date(resources_plugins_path, user_scripts_path)
 
         # args = '&SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP=%s;SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON=%s' % (startup_path, sys.executable)
         return LaunchInformation(exec_path, args, required_env)
