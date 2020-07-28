@@ -18,8 +18,8 @@ import time
 import inspect
 import logging
 import traceback
-
 from functools import wraps
+from distutils.version import LooseVersion
 
 import tank
 from tank.log import LogManager
@@ -38,18 +38,65 @@ __contact__ = "https://www.linkedin.com/in/diegogh/"
 # when Substance Painter software version is above the tested one.
 SHOW_COMP_DLG = "SGTK_COMPATIBILITY_DIALOG_SHOWN"
 
-# # logging functionality
-# def display_error(msg):
-#     t = time.asctime(time.localtime())
-#     print("%s - Shotgun Error | Substance Painter engine | %s " % (t, msg))
+MINIMUM_SUPPORTED_VERSION = "2018.3"
 
-# def display_warning(msg):
-#     t = time.asctime(time.localtime())
-#     print("%s - Shotgun Warning | Substance Painter engine | %s " % (t, msg))
 
-# def display_info(msg):
-#     t = time.asctime(time.localtime())
-#     print("%s - Shotgun Info | Substance Painter engine | %s " % (t, msg))
+def to_new_version_system(version):
+    """
+    Converts a version string into a new style version.
+
+    New version system was introduced in version 2020.1, that became
+    version 6.1.0, so we need to do some magic to normalize versions.
+    https://docs.substance3d.com/spdoc/version-2020-1-6-1-0-194216357.html
+
+    The way we support this new version system is to use LooseVersion for
+    version comparisons. We modify the major version if the version is higher 
+    than 2017.1.0 for the version to become in the style of 6.1, by literally
+    subtracting 2014 to the major version component.
+    This leaves us always with a predictable version system:
+        2.6.2  -> 2.6.2 (really old version)
+        2017.1 -> 3.1
+        2018.0 -> 4.0
+        2020.1 -> 6.1 (newer version system starts)
+        6.2    -> 6.2 ...
+
+    2017.1.0 represents the first time the 2k style version was introduced
+    according to:
+    https://docs.substance3d.com/spdoc/all-changes-188973073.html
+
+    Note that this change means that the LooseVersion is good for comparisons 
+    but NEVER for printing, it would simply print the same version as 
+    LooseVersion does not support rebuilding of the version string from it's 
+    components
+    """
+
+    version = LooseVersion(str(version))
+
+    if version >= LooseVersion("2017.1"):
+        version.version[0] -= 2014
+    return version
+
+
+# logging functionality
+def display_error(msg):
+    t = time.asctime(time.localtime())
+    print("%s - Shotgun Error | Substance Painter engine | %s " % (t, msg))
+
+
+def display_warning(msg):
+    t = time.asctime(time.localtime())
+    print("%s - Shotgun Warning | Substance Painter engine | %s " % (t, msg))
+
+
+def display_info(msg):
+    t = time.asctime(time.localtime())
+    print("%s - Shotgun Info | Substance Painter engine | %s " % (t, msg))
+
+
+def display_debug(msg):
+    if os.environ.get("TK_DEBUG") == "1":
+        t = time.asctime(time.localtime())
+        print("%s - Shotgun Debug | Substance Painter engine | %s " % (t, msg))
 
 # def display_debug(msg):
 #     if os.environ.get("TK_DEBUG") == "1":
@@ -57,9 +104,10 @@ SHOW_COMP_DLG = "SGTK_COMPATIBILITY_DIALOG_SHOWN"
 #         print("%s - Shotgun Debug | Substance Painter engine | %s " % (t, msg))
 
 # methods to support the state when the engine cannot start up
-# for example if a non-tank file is loaded in Substance Painter we load the 
+# for example if a non-tank file is loaded in Substance Painter we load the
 # project context if exists, so we give a chance to the user to at least
 # do the basics operations.
+
 
 def refresh_engine(scene_name, prev_context):
     """
@@ -101,14 +149,15 @@ def refresh_engine(scene_name, prev_context):
         try:
             # could not detect context from path, will use the project context
             # for menus if it exists
-            ctx = engine.sgtk.context_from_entity_dictionary(
-                engine.context.project)
-            message = ("Shotgun Substance Painter Engine could not detect "
-                       "the context\n from the project loaded. "
-                       "Shotgun menus will be reset \n"
-                       "to the project '%s' "
-                       "context."
-                       "\n" % engine.context.project.get('name'))
+            ctx = engine.sgtk.context_from_entity_dictionary(engine.context.project)
+            message = (
+                "Shotgun Substance Painter Engine could not detect "
+                "the context\n from the project loaded. "
+                "Shotgun menus will be reset \n"
+                "to the project '%s' "
+                "context."
+                "\n" % engine.context.project.get("name")
+            )
             engine.show_warning(message)
 
         except tank.TankError as e:
@@ -124,7 +173,7 @@ def refresh_engine(scene_name, prev_context):
             engine.create_shotgun_menu()
             engine.show_error(message)
             return
-    
+
     if ctx != engine.context:
         engine.change_context(ctx)
 
@@ -152,6 +201,7 @@ class SubstancePainterEngine(Engine):
         self.utils = None
         self.dialog_killer = None
         self.widgets = []
+        self._event_callbacks = {}
 
         Engine.__init__(self, *args, **kwargs)
 
@@ -185,7 +235,9 @@ class SubstancePainterEngine(Engine):
         Toggles global debug logging on and off in the log manager.
         This will affect all logging across all of toolkit.
         """
-        self.logger.debug("Setting Substance Logging to: %s" % (not LogManager().global_debug))
+        self.logger.debug(
+            "Calling Substance Painter with debug: %s" % LogManager().global_debug
+        )
 
         # flip debug logging
         LogManager().global_debug = not LogManager().global_debug
@@ -196,15 +248,13 @@ class SubstancePainterEngine(Engine):
         """
         Opens the file system folder where log files are being stored.
         """
-        self.log_info("Log folder is located in '%s'" %
-                      LogManager().log_folder)
+        self.log_info("Log folder is located in '%s'" % LogManager().log_folder)
 
         if self.has_ui:
             # only import QT if we have a UI
             from sgtk.platform.qt import QtGui, QtCore
-            url = QtCore.QUrl.fromLocalFile(
-                LogManager().log_folder
-            )
+
+            url = QtCore.QUrl.fromLocalFile(LogManager().log_folder)
             status = QtGui.QDesktopServices.openUrl(url)
             if not status:
                 self.log_error("Failed to open folder!")
@@ -224,10 +274,11 @@ class SubstancePainterEngine(Engine):
                 {
                     "short_name": "open_log_folder",
                     "icon": icon_path,
-                    "description": ("Opens the folder where log files are "
-                                    "being stored."),
-                    "type": "context_menu"
-                }
+                    "description": (
+                        "Opens the folder where log files are " "being stored."
+                    ),
+                    "type": "context_menu",
+                },
             )
 
     def __register_reload_command(self):
@@ -236,12 +287,15 @@ class SubstancePainterEngine(Engine):
         running apps are registered via a dev descriptor.
         """
         from tank.platform import restart
+
         self.register_command(
             "Reload and Restart",
             restart,
-            {"short_name": "restart",
-             "icon": self.__get_platform_resource_path("reload_256.png"),
-             "type": "context_menu"}
+            {
+                "short_name": "restart",
+                "icon": self.__get_platform_resource_path("reload_256.png"),
+                "type": "context_menu",
+            },
         )
 
     @property
@@ -286,30 +340,50 @@ class SubstancePainterEngine(Engine):
         """
         This method takes care of requests from the dcc app.
         """
-        self.logger.debug("process_request. method: %s | kwargs: %s" % (method, kwargs))
-        
+        self.logger.info("process_request. method: %s | kwargs: %s" % (method, kwargs))
+
         if method == "DISPLAY_MENU":
             menu_position = None
-            clicked_info = kwargs.get('clickedPosition')
+            clicked_info = kwargs.get("clickedPosition")
             if clicked_info:
-                menu_position = [clicked_info['x'], clicked_info['y']]
+                menu_position = [clicked_info["x"], clicked_info["y"]]
 
             self.display_menu(pos=menu_position)
-        
+
         if method == "NEW_PROJECT_CREATED":
             path = kwargs.get("path")
             change_context = self.get_setting("change_context_on_new_project", False)
             if change_context:
                 refresh_engine(path, self.context)
             else:
-                self.logger.info("change_context_on_new_project is off so context won't be changed.")
-        
+                self.logger.info(
+                    "change_context_on_new_project is off so context won't be changed."
+                )
+
         if method == "PROJECT_OPENED":
             path = kwargs.get("path")
             refresh_engine(path, self.context)
 
         if method == "QUIT":
             self.destroy_engine()
+
+        if method in self._event_callbacks:
+            self.logger.info("About to run callbacks for %s" % method)
+            for fn in self._event_callbacks[method]:
+                self.logger.info("  callback: %s" % fn)
+                fn(**kwargs)
+
+    def register_event_callback(self, event_type, callback_fn):
+        if event_type not in self._event_callbacks:
+            self._event_callbacks[event_type] = []
+        self._event_callbacks[event_type].append(callback_fn)
+
+    def unregister_event_callback(self, event_type, callback_fn):
+        if event_type not in self._event_callbacks:
+            return
+
+        if callback_fn in self._event_callbacks[event_type]:
+            self._event_callbacks[event_type].remove(callback_fn)
 
     def pre_app_init(self):
         """
@@ -330,33 +404,43 @@ class SubstancePainterEngine(Engine):
         # check that we are running an ok version of Substance Painter
         current_os = sys.platform
         if current_os not in ["darwin", "win32", "linux64"]:
-            raise tank.TankError("The current platform is not supported!"
-                                " Supported platforms "
-                                "are Mac, Linux 64 and Windows 64.")
+            raise tank.TankError(
+                "The current platform is not supported!"
+                " Supported platforms "
+                "are Mac, Linux 64 and Windows 64."
+            )
 
-        painter_version_str = self.host_info["version"]
-        painter_version = float(".".join(painter_version_str.split(".")[:2]))
-
-        # default menu name is Shotgun but this can be overriden
-        # in the configuration to be Sgtk in case of conflicts
+        # default menu name is Shotgun but this can be overridden
+        # in the configuration to be sgtk in case of conflicts
         self._menu_name = "Shotgun"
         if self.get_setting("use_sgtk_as_menu_name", False):
             self._menu_name = "Sgtk"
 
-        if painter_version < 6.2:
-            msg = ("Shotgun integration is not compatible with Substance Painter versions"
-                   " older than 2.3.0 (found version {})".format(painter_version))
+        painter_version_str = self._dcc_app.get_application_version()
+
+        # New version system was introduced in version 2020.1, that became
+        # version 6.1.0, so we need to do some magic to normalize versions.
+        # https://docs.substance3d.com/spdoc/version-2020-1-6-1-0-194216357.html
+        painter_version = to_new_version_system(painter_version_str)
+        painter_min_supported_version = to_new_version_system(MINIMUM_SUPPORTED_VERSION)
+
+        if painter_version < painter_min_supported_version:
+            msg = (
+                "Shotgun integration is not compatible with Substance Painter versions"
+                " older than %s" % MINIMUM_SUPPORTED_VERSION
+            )
             raise tank.TankError(msg)
 
-        if painter_version > 6.3:
+        if painter_version > painter_min_supported_version:
             # show a warning that this version of Substance Painter isn't yet fully tested
             # with Shotgun:
-            msg = ("The Shotgun Pipeline Toolkit has not yet been fully "
-                   "tested with Substance Painter %s.  "
-                   "You can continue to use Toolkit but you may experience "
-                   "bugs or instability."
-                   "\n\n"
-                   % (painter_version))
+            msg = (
+                "The Shotgun Pipeline Toolkit has not yet been fully "
+                "tested with Substance Painter %s.  "
+                "You can continue to use Toolkit but you may experience "
+                "bugs or instability."
+                "\n\n" % (painter_version)
+            )
 
             # determine if we should show the compatibility warning dialog:
             show_warning_dlg = self.has_ui and SHOW_COMP_DLG not in os.environ
@@ -365,17 +449,13 @@ class SubstancePainterEngine(Engine):
                 # make sure we only show it once per session
                 os.environ[SHOW_COMP_DLG] = "1"
 
-                # split off the major version number - accomodate complex
-                # version strings and decimals:
-                major_version_number_str = painter_version_str.split(".")[0]
-                if (major_version_number_str and
-                        major_version_number_str.isdigit()):
-                    # check against the compatibility_dialog_min_version
-                    # setting
-                    min_ver = self.get_setting(
-                        "compatibility_dialog_min_version")
-                    if int(major_version_number_str) < min_ver:
-                        show_warning_dlg = False
+                # check against the compatibility_dialog_min_version
+                # setting
+                min_version_str = self.get_setting("compatibility_dialog_min_version")
+
+                min_version = to_new_version_system(min_version_str)
+                if painter_version < min_version:
+                    show_warning_dlg = False
 
             # if show_warning_dlg:
             #     # Note, title is padded to try to ensure dialog isn't insanely
@@ -385,7 +465,7 @@ class SubstancePainterEngine(Engine):
             # always log the warning to the script editor:
             self.logger.warning(msg)
 
-            # In the case of Windows, we have the possility of locking up if
+            # In the case of Windows, we have the possibility of locking up if
             # we allow the PySide shim to import QtWebEngineWidgets.
             # We can stop that happening here by setting the following
             # environment variable.
@@ -480,7 +560,7 @@ class SubstancePainterEngine(Engine):
 
         # Run a series of app instance commands at startup.
         self._run_app_instance_commands()
-    
+
         # Create the shotgun menu
         self.create_shotgun_menu()
 
@@ -528,7 +608,8 @@ class SubstancePainterEngine(Engine):
                 # Add entry 'command name: command function' to the command
                 # dictionary of this app instance.
                 cmd_dict = app_instance_commands.setdefault(
-                    app_instance.instance_name, {})
+                    app_instance.instance_name, {}
+                )
                 cmd_dict[cmd_name] = value["callback"]
 
         # Run the series of app instance commands listed in the
@@ -547,13 +628,19 @@ class SubstancePainterEngine(Engine):
                 self.logger.warning(
                     "%s configuration setting 'run_at_startup' requests app"
                     " '%s' that is not installed.",
-                    self.name, app_instance_name)
+                    self.name,
+                    app_instance_name,
+                )
             else:
                 if not setting_cmd_name:
                     # Run all commands of the given app instance.
                     for (cmd_name, command_function) in cmd_dict.iteritems():
-                        msg = ("%s startup running app '%s' command '%s'.",
-                               self.name, app_instance_name, cmd_name)
+                        msg = (
+                            "%s startup running app '%s' command '%s'.",
+                            self.name,
+                            app_instance_name,
+                            cmd_name,
+                        )
                         self.logger.debug(msg)
 
                         command_function()
@@ -562,20 +649,26 @@ class SubstancePainterEngine(Engine):
                     # 'run_at_startup' setting.
                     command_function = cmd_dict.get(setting_cmd_name)
                     if command_function:
-                        msg = ("%s startup running app '%s' command '%s'.",
-                               self.name, app_instance_name, setting_cmd_name)
+                        msg = (
+                            "%s startup running app '%s' command '%s'.",
+                            self.name,
+                            app_instance_name,
+                            setting_cmd_name,
+                        )
                         self.logger.debug(msg)
 
                         command_function()
                     else:
-                        known_commands = ', '.join(
-                            "'%s'" % name for name in cmd_dict)
+                        known_commands = ", ".join("'%s'" % name for name in cmd_dict)
                         self.logger.warning(
                             "%s configuration setting 'run_at_startup' "
                             "requests app '%s' unknown command '%s'. "
                             "Known commands: %s",
-                            self.name, app_instance_name,
-                            setting_cmd_name, known_commands)
+                            self.name,
+                            app_instance_name,
+                            setting_cmd_name,
+                            known_commands,
+                        )
 
     def destroy_engine(self):
         """
@@ -583,10 +676,7 @@ class SubstancePainterEngine(Engine):
         """
         self.logger.debug("%s: Destroying...", self)
         if self._menu_generator:
-            #self._menu_generator.menu_handle.clear()
             substance_painter.ui.delete_ui_element(self._menu_generator.menu_handle.menuAction())
-            # menu_bar = substance_painter.ui.get_main_window().menuBar()
-            # menu_bar.removeAction(self._menu_generator.menu_handle.menuAction())
 
     @property
     def has_ui(self):
@@ -649,5 +739,6 @@ class SubstancePainterEngine(Engine):
                 dialog.close()
             except Exception as exception:
                 traceback.print_exc()
-                self.logger.error("Cannot close dialog %s: %s",
-                                  dialog_window_title, exception)
+                self.logger.error(
+                    "Cannot close dialog %s: %s", dialog_window_title, exception
+                )

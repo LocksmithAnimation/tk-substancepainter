@@ -1,5 +1,6 @@
 """
 Module that encapsulates access to the actual application
+
 """
 
 import os
@@ -50,33 +51,33 @@ class Client(QtCore.QObject):
         self.wait_period = 1
 
         # borrow the engine logger
+        self.log_info = engine.log_info
+        self.log_debug = engine.log_debug
+        self.log_warning = engine.log_warning
+        self.log_error = engine.log_error
 
-        self.engine.log_debug("Client started. - %s " % url)
+        self.log_debug("Client started. - %s " % url)
 
         # A bit of a hack to get responses from the server
         # I cannot wait for python3 concurrency!
         # reference: https://stackoverflow.com/questions/9523370/adding-attributes-to-instance-methods-in-python
         def send_and_receive(self, command, **kwargs):
-            self.engine.log_debug("send_and_receive: message %s" % command)
+            # self.log_debug("send_and_receive: message %s" % command)
 
             # exit the loop if timeout happens
-            timeout_timer = QtCore.QTimer(
-                parent=QtCore.QCoreApplication.instance()
-            )
+            timeout_timer = QtCore.QTimer(parent=QtCore.QCoreApplication.instance())
 
             loop = QtCore.QEventLoop()
 
-            self.send_and_receive.data = None
+            data = None
 
             def await_for_response(result):
                 self.send_and_receive.data = result
-                self.engine.log_debug("exiting the loop: result %s" % result)
+                # self.log_debug("exiting the loop: result %s" % result)
                 loop.quit()
 
-            self.engine.log_debug("in the loop...")
-            self.send_text_message(
-                command, callback=await_for_response, **kwargs
-            )
+            # self.log_debug("in the loop...")
+            self.send_text_message(command, callback=await_for_response, **kwargs)
 
             timeout_timer.timeout.connect(loop.quit)
             timeout_timer.start(5 * 1000.0)
@@ -91,29 +92,29 @@ class Client(QtCore.QObject):
         self.connect_to_server()
 
     def connect_to_server(self):
-        self.engine.log_debug("Client start connection | %s " % QtCore.QUrl(self.url))
+        self.log_debug("Client start connection | %s " % QtCore.QUrl(self.url))
         result = self.client.open(QtCore.QUrl(self.url))
-        self.engine.log_debug("Client start connection | result | %s " % result)
+        self.log_debug("Client start connection | result | %s " % result)
 
     def ping(self):
-        self.engine.log_debug("client: do_ping")
+        self.log_debug("client: do_ping")
         self.client.ping()
 
     def on_connected(self):
         pass
-        self.engine.log_debug("client: on_connected")
+        self.log_debug("client: on_connected")
 
     def on_disconnected(self):
-        self.engine.log_debug("client: on_disconnected")
+        self.log_debug("client: on_disconnected")
         self.engine.process_request("QUIT")
 
     def on_error(self, error_code):
-        self.engine.log_error("client: on_error: {}".format(error_code))
-        self.engine.log_error(self.client.errorString())
+        self.log_error("client: on_error: {}".format(error_code))
+        self.log_error(self.client.errorString())
         self.engine.process_request("QUIT")
 
     def on_state_changed(self, state):
-        self.engine.log_debug("client: on_state_changed: %s" % state)
+        self.log_debug("client: on_state_changed: %s" % state)
         state = self.client.state()
         if state == QAbstractSocket.SocketState.ConnectingState:
             return
@@ -123,26 +124,26 @@ class Client(QtCore.QObject):
             QAbstractSocket.SocketState.ConnectedState,
         ):
             attempts += 1
-            self.engine.log_debug("client: attempted to reconnect : %s" % attempts)
+            self.log_debug("client: attempted to reconnect : %s" % attempts)
             self.connect_to_server()
             time.sleep(self.wait_period)
 
     def on_text_message_received(self, message):
-        # self.engine.log_debug("client: on_text_message_received: %s" % (message))
+        # self.log_debug("client: on_text_message_received: %s" % (message))
         jsonData = json.loads(message)
         message_id = jsonData.get("id")
 
         # requesting data
-        if "method" in jsonData:
-            # self.engine.log_debug("client: request detected: %s" % (message))
+        if jsonData.has_key("method"):
+            # self.log_debug("client: request detected: %s" % (message))
             method = jsonData.get("method")
             params = jsonData.get("params")
             self.engine.process_request(method, **params)
 
-        if "result" in jsonData:
-            # self.engine.log_debug("client: result detected: %s" % (message))
+        if jsonData.has_key("result"):
+            # self.log_debug("client: result detected: %s" % (message))
             if message_id in self.callbacks:
-                # self.engine.log_debug(
+                # self.log_debug(
                 #     "client: requesting callback result for message: %s"
                 #     % message_id
                 # )
@@ -150,24 +151,20 @@ class Client(QtCore.QObject):
                 self.callbacks[message_id](result)
                 del self.callbacks[message_id]
 
-    def send_text_message(
-        self, command, message_id=None, callback=None, **kwargs
-    ):
+    def send_text_message(self, command, message_id=None, callback=None, **kwargs):
         if self.client.state() in (
             QAbstractSocket.SocketState.ClosingState,
             QAbstractSocket.SocketState.UnconnectedState,
         ):
-            self.engine.log_debug(
-                "client: is not connected!, ignoring message: %s" % message_id
-            )
+            # self.log_debug(
+            #     "client: is not connected!, ignoring message: %s" % message_id
+            # )
             return
 
         # wait until connected
-        while (
-            self.client.state() == QAbstractSocket.SocketState.ConnectingState
-        ):
+        while self.client.state() == QAbstractSocket.SocketState.ConnectingState:
             QCoreApplication.processEvents()
-            #self.engine.log_debug("client: waiting state: %s" % self.client.state())
+            # self.log_debug("client: waiting state: %s" % self.client.state())
             time.sleep(self.wait_period)
             pass
 
@@ -178,20 +175,15 @@ class Client(QtCore.QObject):
             self.callbacks[message_id] = callback
 
         message = json.dumps(
-            {
-                "jsonrpc": "2.0",
-                "method": command,
-                "params": kwargs,
-                "id": message_id,
-            }
+            {"jsonrpc": "2.0", "method": command, "params": kwargs, "id": message_id,}
         )
 
-        #self.engine.log_debug("client: send_message: %s" % message)
+        # self.log_debug("client: send_message: %s" % message)
         self.client.sendTextMessage(message)
         return message_id
 
     def on_pong(self, elapsedTime, payload):
-        # self.engine.log_debug(
+        # self.log_debug(
         #     "client: onPong - time: {} ; payload: {}".format(
         #         elapsedTime, payload
         #     )
@@ -199,7 +191,7 @@ class Client(QtCore.QObject):
         pass
 
     def close(self):
-        self.engine.log_debug("client: closed.")
+        self.log_debug("client: closed.")
         self.client.close()
 
 
@@ -209,26 +201,22 @@ class EngineClient(Client):
 
     def get_application_version(self):
         version = self.send_and_receive("GET_VERSION")
-        self.engine.log_debug("version: %s (%s)" % (version, type(version)))
+        self.log_debug("version: %s (%s)" % (version, type(version)))
         painter_version = version["painter"]
-        self.engine.log_debug("painter_version: %s" % painter_version)
+        self.log_debug("painter_version: %s" % painter_version)
         return painter_version
 
     def get_current_project_path(self):
         path = self.send_and_receive("GET_CURRENT_PROJECT_PATH")
-        self.engine.log_debug("CURRENT_PROJECT_PATH: %s (%s)" % (path, type(path)))
+        self.log_debug("CURRENT_PROJECT_PATH: %s (%s)" % (path, type(path)))
         return path
 
-    def create_project(self, geom_path, template_path, project_settings, check=True):
-        result = self.send_and_receive("CREATE_PROJECT", path=geom_path, template_path=template_path, project_settings=project_settings, check=check)
-        return result
-
     def need_saving(self):
-        result = self.send_and_receive("NEEDS_SAVING")
+        result = self.send_and_receive("NEEDS_SAVING", path=path)
         return result
 
-    def open_project(self, path, check=True):
-        path = self.send_and_receive("OPEN_PROJECT", path=path, check=check)
+    def open_project(self, path):
+        path = self.send_and_receive("OPEN_PROJECT", path=path)
 
     def save_project_as(self, path):
         success = self.send_and_receive("SAVE_PROJECT_AS", path=path)
@@ -250,9 +238,7 @@ class EngineClient(Client):
         self.send_text_message(event_name)
 
     def execute(self, statement_str):
-        result = self.send_and_receive(
-            "EXECUTE_STATEMENT", statement=statement_str
-        )
+        result = self.send_and_receive("EXECUTE_STATEMENT", statement=statement_str)
         return result
 
     def extract_thumbnail(self, filename):
@@ -285,9 +271,35 @@ class EngineClient(Client):
         return result
 
     def export_document_maps(self, destination):
-        result = self.send_and_receive(
-            "EXPORT_DOCUMENT_MAPS", destination=destination
+        # This is a trick to wait until the async process of
+        # exporting textures finishes.
+        self.__export_results = None
+
+        def run_once_finished_exporting_maps(**kwargs):
+            self.__export_results = kwargs.get("map_infos", {})
+
+        self.engine.register_event_callback(
+            "EXPORT_FINISHED", run_once_finished_exporting_maps
         )
+
+        self.log_debug("Starting map export...")
+        result = self.send_and_receive("EXPORT_DOCUMENT_MAPS", destination=destination)
+
+        while self.__export_results is None:
+            self.log_debug("Waiting for maps to be exported ...")
+            QCoreApplication.processEvents()
+            time.sleep(self.wait_period)
+
+        self.engine.unregister_event_callback(
+            "EXPORT_FINISHED", run_once_finished_exporting_maps
+        )
+
+        result = self.__export_results
+
+        # no need for this variable anymore
+        del self.__export_results
+
+        self.log_debug("Map export ended.")
         return result
 
     def update_document_resources(self, old_url, new_url):
@@ -298,10 +310,6 @@ class EngineClient(Client):
 
     def document_resources(self):
         result = self.send_and_receive("DOCUMENT_RESOURCES")
-        return result
-
-    def get_shelves(self):
-        result = self.send_and_receive("GET_SHELVES")
         return result
 
     def log_info(self, message):
@@ -323,14 +331,13 @@ class EngineClient(Client):
         self.send_text_message("TOGGLE_DEBUG_LOGGING", enabled=enabled)
 
 
-# if __name__ == "__main__":
-#     # Is this doing anything?
-#     global client
-#     app = QApplication(sys.argv)
-#     client = Client(app)
-#     version = get_application_version(client)
-#     client.log_debug("application_version: %s" % version)
-#     version2 = get_application_version(client)
-#     client.log_debug("application_version2: %s" % version2)
+if __name__ == "__main__":
+    global client
+    app = QApplication(sys.argv)
+    client = Client(app)
+    version = get_application_version(client)
+    client.log_debug("application_version: %s" % version)
+    version2 = get_application_version(client)
+    client.log_debug("application_version2: %s" % version2)
 
-#     app.exec_()
+    app.exec_()
