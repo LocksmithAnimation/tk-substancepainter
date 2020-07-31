@@ -27,12 +27,8 @@ __contact__ = "https://www.linkedin.com/in/diegogh/"
 logger = sgtk.LogManager.get_logger(__name__)
 
 
-# We use this to indicate that we could not retrieve the version for the
-# binary/executable, so we allow the engine to run with it
-UNKNOWN_VERSION = "UNKNOWN_VERSION"
-
 # note that this is the same in engine.py
-MINIMUM_SUPPORTED_VERSION = "2018.3"
+MINIMUM_SUPPORTED_VERSION = "6.2"
 
 
 def to_new_version_system(version):
@@ -69,125 +65,6 @@ def to_new_version_system(version):
     if version >= LooseVersion("2017.1"):
         version.version[0] -= 2014
     return version
-
-
-# adapted from:
-# https://stackoverflow.com/questions/2270345/finding-the-version-of-an-application-from-python
-def get_file_info(filename, info):
-    """
-    Extract information from a file.
-    """
-    import array
-    from ctypes import windll, create_string_buffer, c_uint, string_at, byref
-
-    # Get size needed for buffer (0 if no info)
-    size = windll.version.GetFileVersionInfoSizeA(filename, None)
-    # If no info in file -> empty string
-    if not size:
-        return ""
-
-    # Create buffer
-    res = create_string_buffer(size)
-    # Load file informations into buffer res
-    windll.version.GetFileVersionInfoA(filename, None, size, res)
-    r = c_uint()
-    l = c_uint()
-    # Look for codepages
-    windll.version.VerQueryValueA(res, "\\VarFileInfo\\Translation", byref(r), byref(l))
-    # If no codepage -> empty string
-    if not l.value:
-        return ""
-
-    # Take the first codepage (what else ?)
-    codepages = array.array("H", string_at(r.value, l.value))
-    codepage = tuple(codepages[:2].tolist())
-
-    # Extract information
-    windll.version.VerQueryValueA(
-        res, ("\\StringFileInfo\\%04x%04x\\" + info) % codepage, byref(r), byref(l)
-    )
-    return string_at(r.value, l.value)
-
-
-def md5(fname):
-    hash_md5 = hashlib.md5()
-    with open(fname, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
-
-def samefile(file1, file2):
-    return md5(file1) == md5(file2)
-
-
-# based on:
-# https://stackoverflow.com/questions/38876945/copying-and-merging-directories-excluding-certain-extensions
-def copytree_multi(src, dst, symlinks=False, ignore=None):
-    names = os.listdir(src)
-    if ignore is not None:
-        ignored_names = ignore(src, names)
-    else:
-        ignored_names = set()
-
-    if not os.path.isdir(dst):
-        os.makedirs(dst)
-
-    errors = []
-    for name in names:
-        if name in ignored_names:
-            continue
-        srcname = os.path.join(src, name)
-        dstname = os.path.join(dst, name)
-
-        try:
-            if symlinks and os.path.islink(srcname):
-                linkto = os.readlink(srcname)
-                os.symlink(linkto, dstname)
-            elif os.path.isdir(srcname):
-                copytree_multi(srcname, dstname, symlinks, ignore)
-            else:
-                if os.path.exists(dstname):
-                    if not samefile(srcname, dstname):
-                        os.unlink(dstname)
-                        shutil.copy2(srcname, dstname)
-                        logger.info("File copied: %s" % dstname)
-                    else:
-                        # same file, so ignore the copy
-                        logger.info("Same file, skipping: %s" % dstname)
-                        pass
-                else:
-                    shutil.copy2(srcname, dstname)
-        except (IOError, os.error) as why:
-            errors.append((srcname, dstname, str(why)))
-        except shutil.Error as err:
-            errors.extend(err.args[0])
-    try:
-        shutil.copystat(src, dst)
-    except WindowsError:
-        pass
-    except OSError as why:
-        errors.extend((src, dst, str(why)))
-    if errors:
-        raise shutil.Error(errors)
-
-
-def ensure_scripts_up_to_date(engine_scripts_path, scripts_folder):
-    logger.info("Updating scripts...: %s" % engine_scripts_path)
-    logger.info("                     scripts_folder: %s" % scripts_folder)
-
-    copytree_multi(engine_scripts_path, scripts_folder)
-
-    return True
-
-
-def get_free_port():
-    # Ask the OS to allocate a port.
-    sock = socket.socket()
-    sock.bind(("127.0.0.1", 0))
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
 
 
 class SubstancePainterLauncher(SoftwareLauncher):
@@ -242,36 +119,15 @@ class SubstancePainterLauncher(SoftwareLauncher):
         """
         required_env = {}
 
-        # Run the engine's userSetup.py file when Clarisse starts up
-        # by appending it to the env PYTHONPATH.
-        sgtk.util.append_path_to_env_var(
-            "SUBSTANCE_PAINTER_PLUGINS_PATH", self.disk_location
-        )
-        required_env["SUBSTANCE_PAINTER_PLUGINS_PATH"] = os.environ[
-            "SUBSTANCE_PAINTER_PLUGINS_PATH"
-        ]
-
-        resources_plugins_path = os.path.join(
-            self.disk_location, "resources", "plugins"
-        )
-
-        # Run the engine's init.py file when SubstancePainter starts up
-        # TODO, maybe start engine here
-        startup_path = os.path.join(self.disk_location, "startup", "bootstrap.py")
+        # Run the engine's startup plugin when Substance Painter starts up
+        # by adding it the plugins path
+        required_env["SUBSTANCE_PAINTER_PLUGINS_PATH"] = self.disk_location
 
         # Prepare the launch environment with variables required by the
         # classic bootstrap approach.
         self.logger.debug(
             "Preparing SubstancePainter Launch via Toolkit Classic methodology ..."
         )
-
-        required_env["SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP"] = startup_path.replace("\\", "/")
-
-        required_env["SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON"] = sys.executable.replace("\\", "/")
-
-        required_env["SGTK_SUBSTANCEPAINTER_SGTK_MODULE_PATH"] = sgtk.get_sgtk_module_path()
-
-        required_env["SGTK_SUBSTANCEPAINTER_ENGINE_PORT"] = str(get_free_port())
 
         required_env["TK_DEBUG"] = os.environ.get("TK_DEBUG") and "true" or ""
 
@@ -294,35 +150,6 @@ class SubstancePainterLauncher(SoftwareLauncher):
 
         required_env["SGTK_ENGINE"] = self.engine_name
         required_env["SGTK_CONTEXT"] = sgtk.context.serialize(self.context)
-
-        # ensure scripts are up to date on the substance painter side
-
-        # Grab the name of the executable. This is for the case when we're 
-        # running the Substance Painter Beta, so we'll put the plug-ins into the 
-        # correct place.
-        exec_name = os.path.splitext(os.path.basename(exec_path))[0]
-
-        # Platform-specific plug-in paths
-
-        if sys.platform == "win32":
-            import ctypes.wintypes
-
-            CSIDL_PERSONAL = 5  # My Documents
-            SHGFP_TYPE_CURRENT = 0  # Get current My Documents folder, not default value
-
-            path_buffer = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
-            ctypes.windll.shell32.SHGetFolderPathW(
-                None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, path_buffer
-            )
-
-            user_scripts_path = path_buffer.value + r"\Allegorithmic\{}\plugins".format(exec_name)
-
-        else:
-            user_scripts_path = os.path.expanduser(
-                r"~/Documents/Allegorithmic/Substance Painter/plugins"
-            )
-
-        # ensure_scripts_up_to_date(resources_plugins_path, user_scripts_path)
 
         # args = '&SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP=%s;SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON=%s' % (startup_path, sys.executable)
         return LaunchInformation(exec_path, args, required_env)

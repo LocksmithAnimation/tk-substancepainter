@@ -96,6 +96,14 @@ configuration:
         default_value: []
         values:
             type: str
+    
+    toolbar_commands:
+        type: list
+        description: List of engine commands that should be represented in the toolbar_commands
+        allows_empty: True
+        default_value: ["New File", "Open File", "Save File", "Version Up"]
+        values:
+            type: str
 
 # the Shotgun fields that this engine needs in order to operate correctly
 requires_shotgun_fields:

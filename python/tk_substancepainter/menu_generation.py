@@ -9,7 +9,7 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 """
-Menu handling for Substnace Painter
+Menu handling for Substance Painter
 
 """
 
@@ -18,6 +18,8 @@ import sys
 import os
 import unicodedata
 import operator
+
+import substance_painter
 
 
 __author__ = "Diego Garcia Huerta"
@@ -35,9 +37,21 @@ class MenuGenerator(object):
     def __init__(self, engine, menu_name):
         self._engine = engine
         self._menu_name = menu_name
-        self._dialogs = []
         self.menu_handle = QtWidgets.QMenu(self._menu_name, None)
-        self._ui_cache = []
+        self.sub_menus = []
+
+    def cleanup(self):
+        """
+        If sub-menus are not destroyed utterly they will cause Substance to
+        crash at fun and unexpected moments.
+        """
+        self.sub_menus.reverse() # Ensure leaf menus are cleaned up before their parents
+        for sub_menu in self.sub_menus:
+            self.menu_handle.removeAction(sub_menu.menuAction())
+            sub_menu.deleteLater()
+        self.sub_menus = []
+        substance_painter.ui.delete_ui_element(self.menu_handle)
+        self.menu_handle = None
 
     def create_menu(self, *args):
         """
@@ -112,20 +126,26 @@ class MenuGenerator(object):
     def _add_sub_menu(self, menu_name, parent_menu):
         sub_menu = QtWidgets.QMenu(title=menu_name, parent=parent_menu)
         parent_menu.addMenu(sub_menu)
+        self.sub_menus.append(sub_menu)
         return sub_menu
 
     def _add_menu_item(self, name, parent_menu, callback, properties=None):
         action = QtWidgets.QAction(name, parent_menu)
         parent_menu.addAction(action)
-        action.triggered.connect(callback)
+        connection_type = QtCore.Qt.AutoConnection
+        if name == "Reload and Restart":
+            # If we send a command that destroys the menu directly from and action
+            # on a sub-menu, Substance will crash. This give us an indirect method.
+            connection_type = QtCore.Qt.QueuedConnection
+        action.triggered.connect(callback, connection_type)
 
         if properties:
             # if "icon" in properties:
             #     icon = QtGui.QIcon(properties["icon"])
             #     action.setIcon(icon)
             if "tooltip" in properties:
-                action.setTooltip(properties["tooltip"])
-                action.setStatustip(properties["tooltip"])
+                action.setToolTip(properties["tooltip"])
+                action.setStatusTip(properties["tooltip"])
             if "enable_callback" in properties:
                 action.setEnabled(properties["enable_callback"]())
 

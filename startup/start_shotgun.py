@@ -17,8 +17,6 @@ import os
 import sys
 import traceback
 
-import sgtk
-
 __author__ = "Diego Garcia Huerta"
 __email__ = "diegogh2000@gmail.com"
 
@@ -66,7 +64,7 @@ def start_toolkit_classic():
     try:
         # Deserialize the environment context
         context = sgtk.context.deserialize(env_context)
-    except Exception, e:
+    except Exception as e:
         msg = (
             "Shotgun: Could not create context! Shotgun Pipeline Toolkit"
             " will be disabled. Details: %s" % e
@@ -81,7 +79,7 @@ def start_toolkit_classic():
         logger.debug(
             "Launching engine instance '%s' for context %s" % (env_engine, env_context)
         )
-        engine = sgtk.platform.start_engine(env_engine, context.sgtk, context)
+        sgtk.platform.start_engine(env_engine, context.sgtk, context)
         logger.debug("Current engine '%s'" % sgtk.platform.current_engine())
 
     except Exception as e:
@@ -130,31 +128,13 @@ def start_toolkit():
             del os.environ[var]
 
 
-def setup_environment():
-    SGTK_SUBSTANCEPAINTER_SGTK_MODULE_PATH = os.environ[
-        "SGTK_SUBSTANCEPAINTER_SGTK_MODULE_PATH"
-    ]
-
-    if (
-        SGTK_SUBSTANCEPAINTER_SGTK_MODULE_PATH
-        and SGTK_SUBSTANCEPAINTER_SGTK_MODULE_PATH not in sys.path
-    ):
-        sys.path.insert(0, SGTK_SUBSTANCEPAINTER_SGTK_MODULE_PATH)
-
-plugin_widgets = []
 def start_plugin():
     """This method is called when the plugin is started."""
-    setup_environment()
     start_toolkit()
 
 
 def close_plugin():
-    import substance_painter
-    """This method is called when the plugin is stopped."""
-    engine = sgtk.platform.current_engine()
-    if engine:
-        engine.destroy()
-
+    pass
 
 
 if __name__ == "__main__":

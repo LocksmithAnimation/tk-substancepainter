@@ -39,34 +39,18 @@ def get_shelves():
     shelf_path = os.path.join(install_path, "resources", "shelf")
     shelves = {x:os.path.join(shelf_path, x) for x in os.listdir(shelf_path) if os.path.isdir(os.path.join(shelf_path, x))}
     return shelves
-    
-
-class DialogKiller(QtCore.QObject):
-    def __init__(self):
-        super(DialogKiller, self).__init__()
-        self.killable = False
-
-    def dock_vis(self, vis):
-        if vis:
-            self.killable = True
-        if not self.killable:
-            return
-        print("VIS: {}".format(vis))
-        print("Sender: {}".format(self.sender()))
-        print("Children: {}".format(self.sender().children()))
-        print("Widget: {}".format(self.sender().widget()))
-        if not vis:
-            self.sender().widget().close()
-            substance_painter.ui.delete_ui_element(self.sender())
 
 
 class CheckFilter(QtCore.QObject):
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.Type.Close:
-            self.kill_it()
+            self.kill_it(obj)
             return True
         return QtCore.QObject.eventFilter(self, obj, event)
 
-    def kill_it(self):
-        self.parent().widget().close()
-        substance_painter.ui.delete_ui_element(self.parent())
+    def kill_it(self, dock_widget):
+        engine = sgtk.platform.current_engine()
+        dock_widget.widget().close()
+        substance_painter.ui.delete_ui_element(dock_widget)
+        if engine and dock_widget in engine.widgets:
+            engine.widgets.remove(dock_widget)
