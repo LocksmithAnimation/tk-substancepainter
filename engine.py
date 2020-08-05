@@ -58,8 +58,9 @@ class SubstancePainterEngine(Engine):
         """
         self._menu_generator = None
         self._toolbar_generator = None
+        self.toolbar_commands = []
         self._shutting_down = False
-        self.widgets = []
+        self.widgets = {}
         super(SubstancePainterEngine, self).__init__(*args, **kwargs)
 
     @property
@@ -190,24 +191,20 @@ class SubstancePainterEngine(Engine):
         dialog.update()
         return dialog
 
-    def show_dialog(self, title, bundle, widget_class, *args, **kwargs):
-        dialog, widget = self._create_dialog_with_widget(
-            title, bundle, widget_class, *args, **kwargs
-        )
-        preferred_size = {"width": widget.width() + 4, "height":widget.height() + 81}
-        dialog.setParent(None)
-        dock_widget = substance_painter.ui.add_dock_widget(dialog)
-        dock_widget.setFloating(True)
+    def show_panel(self, panel_id, title, bundle, widget_class, *args, **kwargs):
+        if panel_id in self.widgets:
+            dock_widget = self.widgets[panel_id]
+        else:
+            dialog, widget = self._create_dialog_with_widget(
+                title, bundle, widget_class, *args, **kwargs
+            )
+            dialog.setObjectName(panel_id)
+            preferred_size = {"width": widget.width() + 4, "height":widget.height() + 81}
+            dock_widget = substance_painter.ui.add_dock_widget(dialog)
+            self.widgets[panel_id] = dock_widget
         dock_widget.show()
-        dock_widget.installEventFilter(self.utils.CheckFilter(dock_widget))
-        self.widgets.append(dock_widget)
-        parent_geo = self._get_dialog_parent().geometry()
-        dock_widget.setGeometry((parent_geo.width() - preferred_size["width"]) * 0.5,
-                                (parent_geo.height() - preferred_size["height"]) * 0.5,
-                                preferred_size["width"],
-                                preferred_size["height"])
 
-        return widget
+        return dock_widget
 
     def create_shotgun_menu(self):
         """
@@ -270,18 +267,18 @@ class SubstancePainterEngine(Engine):
         # Make a copy of the list of Tank dialogs that have been created by the
         # engine and are still opened since the original list will be updated
         # when each dialog is closed.
-        opened_dialog_list = self.widgets[:]
+        opened_panel_list = list(self.widgets.keys())
 
         # Loop through the list of opened Tank dialogs.
-        for dialog in opened_dialog_list:
-            dialog_window_title = dialog.windowTitle()
+        for panel_id in opened_panel_list:
+            panel = self.widgets.pop(panel_id)
+            panel_window_title = panel.windowTitle()
             try:
-                # Close the dialog and let its close callback remove it from
-                # the original dialog list.
-                self.logger.debug("Closing dialog %s.", dialog_window_title)
-                dialog.close()
+                self.logger.debug("Closing dialog %s", panel_window_title)
+                panel.widget().close()
+                substance_painter.ui.delete_ui_element(panel)
             except Exception as exception:
                 traceback.print_exc()
                 self.logger.error(
-                    "Cannot close dialog %s: %s", dialog_window_title, exception
+                    "Cannot close dialog %s: %s", panel_window_title, exception
                 )

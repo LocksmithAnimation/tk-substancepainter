@@ -43,7 +43,7 @@ def get_shelves():
 
 class CheckFilter(QtCore.QObject):
     def eventFilter(self, obj, event):
-        if event.type() == QtCore.QEvent.Type.Close:
+        if event.type() is QtCore.QEvent.Type.Close:
             self.kill_it(obj)
             return True
         return QtCore.QObject.eventFilter(self, obj, event)
