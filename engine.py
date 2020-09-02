@@ -60,7 +60,8 @@ class SubstancePainterEngine(Engine):
         self._toolbar_generator = None
         self.toolbar_commands = []
         self._shutting_down = False
-        self.widgets = {}
+        self.__qt_panels = {}
+        self.__qt_dialogs = []
         super(SubstancePainterEngine, self).__init__(*args, **kwargs)
 
     @property
@@ -191,21 +192,6 @@ class SubstancePainterEngine(Engine):
         dialog.update()
         return dialog
 
-    def show_panel(self, panel_id, title, bundle, widget_class, *args, **kwargs):
-        if panel_id in self.widgets:
-            dock_widget = self.widgets[panel_id]
-        else:
-            dialog, widget = self._create_dialog_with_widget(
-                title, bundle, widget_class, *args, **kwargs
-            )
-            dialog.setObjectName(panel_id)
-            preferred_size = {"width": widget.width() + 4, "height":widget.height() + 81}
-            dock_widget = substance_painter.ui.add_dock_widget(dialog)
-            self.widgets[panel_id] = dock_widget
-        dock_widget.show()
-
-        return dock_widget
-
     def create_shotgun_menu(self):
         """
         Creates the main Shotgun menu in Substance Painter.
@@ -231,6 +217,57 @@ class SubstancePainterEngine(Engine):
         :return: QT Parent window (:class:`PySide.QtGui.QWidget`)
         """
         return substance_painter.ui.get_main_window()
+
+    def show_dialog(self, title, bundle, widget_class, *args, **kwargs):
+        """
+        Shows a non-modal dialog window in a way suitable for this engine.
+        The engine will attempt to parent the dialog nicely to the host
+        application.
+
+        :param title: The title of the window
+        :param bundle: The app, engine or framework object that is associated
+            with this window
+        :param widget_class: The class of the UI to be constructed. This must
+            derive from QWidget.
+
+        Additional parameters specified will be passed through to the
+        widget_class constructor.
+
+        :returns: the created widget_class instance
+        """
+        if not self.has_ui:
+            self.logger.error(
+                "Sorry, this environment does not support UI display! Cannot "
+                "show the requested window '%s'." % title
+            )
+            return None
+
+        # create the dialog:
+        dialog, widget = self._create_dialog_with_widget(
+            title, bundle, widget_class, *args, **kwargs
+        )
+
+        self.__qt_dialogs.append(dialog)
+
+        self.logger.debug("Showing dialog: %s" % (title,))
+        dialog.show()
+
+        return widget
+
+    def show_panel(self, panel_id, title, bundle, widget_class, *args, **kwargs):
+        if panel_id in self.__qt_panels:
+            dock_widget = self.__qt_panels[panel_id]
+        else:
+            dialog, widget = self._create_dialog_with_widget(
+                title, bundle, widget_class, *args, **kwargs
+            )
+            dialog.setObjectName(panel_id)
+            preferred_size = {"width": widget.width() + 4, "height":widget.height() + 81}
+            dock_widget = substance_painter.ui.add_dock_widget(dialog)
+            self.__qt_panels[panel_id] = dock_widget
+        dock_widget.show()
+
+        return dock_widget
 
     def __get_platform_resource_path(self, filename):
         """
@@ -264,14 +301,19 @@ class SubstancePainterEngine(Engine):
         engine.
         """
 
+        for dialog in self.__qt_dialogs:
+            dialog.hide()
+            dialog.setParent(None)
+            dialog.deleteLater()
+
         # Make a copy of the list of Tank dialogs that have been created by the
         # engine and are still opened since the original list will be updated
         # when each dialog is closed.
-        opened_panel_list = list(self.widgets.keys())
+        opened_panel_list = list(self.__qt_panels.keys())
 
         # Loop through the list of opened Tank dialogs.
         for panel_id in opened_panel_list:
-            panel = self.widgets.pop(panel_id)
+            panel = self.__qt_panels.pop(panel_id)
             panel_window_title = panel.windowTitle()
             try:
                 self.logger.debug("Closing dialog %s", panel_window_title)
