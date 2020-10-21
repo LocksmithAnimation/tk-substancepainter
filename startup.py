@@ -123,6 +123,14 @@ class SubstancePainterLauncher(SoftwareLauncher):
         # by adding it the plugins path
         required_env["SUBSTANCE_PAINTER_PLUGINS_PATH"] = self.disk_location
 
+        # Add any additional shelf paths to the environment. By itself, this 
+        # does nothing (this is not a variable recognised by Substance Painter), 
+        # but it is picked up by the substancepainter_initialize Rez package and 
+        # added (by editing the Windows registry).
+        shelf_path = self.get_setting("shelf_path")
+        if shelf_path is not None:
+            required_env["LSA_SUBSTANCE_PAINTER_PROJECT_SHELF"] = shelf_path
+
         # Prepare the launch environment with variables required by the
         # classic bootstrap approach.
         self.logger.debug(
