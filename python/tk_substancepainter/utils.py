@@ -5,40 +5,23 @@ import sys
 from sgtk.platform.qt import QtGui, QtCore
 import substance_painter
 
-
-def get_unlisted_resources(file_extension, shelf_subdir, shelf_names=None):
-    resources = {}
-    engine = sgtk.platform.current_engine()
-    all_shelves = get_shelves()
-    shelves = {}
-
-    if (shelf_names):
-        for shelf_name in shelf_names:
-            shelves[shelf_name] = all_shelves[shelf_name]
-    else:
-        shelves = all_shelves
-
-    for shelf_name, shelf_path in shelves.items():
-        resource_dir = os.path.join(shelf_path, shelf_subdir)
-        if not os.path.exists(resource_dir):
-            continue
-        files = os.listdir(resource_dir)
-
-        for f in files:
-            full_path = os.path.join(resource_dir, f)
-            if os.path.isdir(full_path):
-                continue
-
-            if f.endswith(".{}".format(file_extension)):
-                resources[f.split(".")[0]] = full_path
-    return resources
+import substancepainter_initialize.shelf
 
 
-def get_shelves():
-    install_path = os.path.dirname(sys.executable)
-    shelf_path = os.path.join(install_path, "resources", "shelf")
-    shelves = {x:os.path.join(shelf_path, x) for x in os.listdir(shelf_path) if os.path.isdir(os.path.join(shelf_path, x))}
-    return shelves
+def get_templates(shelf_names=None):
+    """
+    Return a list of project templates for the given list of shelf names (or all 
+    shelves if None).
+
+    :param shelf_names: [description], defaults to None
+    :type shelf_names: [type], optional
+    :return: [description]
+    :rtype: [type]
+    """
+    # NOTE: This is here just so SGTK apps can use the engine as the source of 
+    # truth, even though this just delegates to the substancepainter_initialize 
+    # package.
+    return substancepainter_initialize.shelf.get_templates(shelf_names=shelf_names)
 
 
 class CheckFilter(QtCore.QObject):
