@@ -17,6 +17,8 @@ import os
 import sys
 import traceback
 
+import substancepainter_initialize.shelf
+
 __author__ = "Diego Garcia Huerta"
 __email__ = "diegogh2000@gmail.com"
 
@@ -73,6 +75,8 @@ def start_toolkit_classic():
         msg += "".join(traceback.format_exception(etype, value, tb))
         display_error(logger, msg)
         return
+
+    substancepainter_initialize.shelf.register_pipeline_shelf()
 
     try:
         # Start up the toolkit engine from the environment data

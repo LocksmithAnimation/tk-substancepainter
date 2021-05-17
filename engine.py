@@ -262,7 +262,6 @@ class SubstancePainterEngine(Engine):
                 title, bundle, widget_class, *args, **kwargs
             )
             dialog.setObjectName(panel_id)
-            preferred_size = {"width": widget.width() + 4, "height":widget.height() + 81}
             dock_widget = substance_painter.ui.add_dock_widget(dialog)
             self.__qt_panels[panel_id] = dock_widget
         dock_widget.show()
