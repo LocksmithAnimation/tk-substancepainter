@@ -40,7 +40,7 @@ def to_new_version_system(version):
     https://docs.substance3d.com/spdoc/version-2020-1-6-1-0-194216357.html
 
     The way we support this new version system is to use LooseVersion for
-    version comparisons. We modify the major version if the version is higher 
+    version comparisons. We modify the major version if the version is higher
     than 2017.1.0 for the version to become in the style of 6.1, by literally
     subtracting 2014 to the major version component.
     This leaves us always with a predictable version system:
@@ -54,9 +54,9 @@ def to_new_version_system(version):
     according to:
     https://docs.substance3d.com/spdoc/all-changes-188973073.html
 
-    Note that this change means that the LooseVersion is good for comparisons 
-    but NEVER for printing, it would simply print the same version as 
-    LooseVersion does not support rebuilding of the version string from it's 
+    Note that this change means that the LooseVersion is good for comparisons
+    but NEVER for printing, it would simply print the same version as
+    LooseVersion does not support rebuilding of the version string from it's
     components
     """
 
@@ -91,7 +91,9 @@ class SubstancePainterLauncher(SoftwareLauncher):
 
     EXECUTABLE_TEMPLATES = {
         "darwin": ["/Applications/Allegorithmic/Substance Painter.app"],
-        "win32": ["C:/Program Files/Allegorithmic/Substance Painter/Substance Painter.exe"],
+        "win32": [
+            "C:/Program Files/Allegorithmic/Substance Painter/Substance Painter.exe"
+        ],
         "linux2": [
             "/usr/Allegorithmic/Substance Painter",
             "/usr/Allegorithmic/Substance_Painter/Substance Painter",
@@ -123,14 +125,6 @@ class SubstancePainterLauncher(SoftwareLauncher):
         # by adding it the plugins path
         required_env["SUBSTANCE_PAINTER_PLUGINS_PATH"] = self.disk_location
 
-        # Add any additional shelf paths to the environment. By itself, this 
-        # does nothing (this is not a variable recognised by Substance Painter), 
-        # but it is picked up by the substancepainter_initialize Rez package and 
-        # added (by editing the Windows registry).
-        shelf_path = self.get_setting("shelf_path")
-        if shelf_path is not None:
-            required_env["LSA_SUBSTANCE_PAINTER_PROJECT_SHELF"] = shelf_path
-
         # Prepare the launch environment with variables required by the
         # classic bootstrap approach.
         self.logger.debug(
@@ -143,23 +137,9 @@ class SubstancePainterLauncher(SoftwareLauncher):
             # Add the file name to open to the launch environment
             required_env["SGTK_FILE_TO_OPEN"] = file_to_open
 
-        # First big disclaimer: qml does not support environment variables for safety reasons
-        # the only way to pass information inside substance painter is to actually encode
-        # as a string and trick the program to think it is opening a substance painter project
-        # The reason why this works is because inside substance painter the original file is
-        # used with an URL, ie. //file/serve/filename, so we add to the URL using & to pass
-        # our now fake environment variables.
-        # Only the startup script, the location of python and potentially the file to open
-        # are needed.
-        args = ""
-        args = ["%s=%s" % (k, v) for k, v in required_env.items()]
-        args = '"&%s"' % "&".join(args)
-        logger.info("running %s" % args)
-
         required_env["SGTK_ENGINE"] = self.engine_name
         required_env["SGTK_CONTEXT"] = sgtk.context.serialize(self.context)
 
-        # args = '&SGTK_SUBSTANCEPAINTER_ENGINE_STARTUP=%s;SGTK_SUBSTANCEPAINTER_ENGINE_PYTHON=%s' % (startup_path, sys.executable)
         return LaunchInformation(exec_path, args, required_env)
 
     def _icon_from_engine(self):
@@ -191,8 +171,8 @@ class SubstancePainterLauncher(SoftwareLauncher):
         method.
 
         To check if the version is supported:
-        
-        First we make an exception for cases were we cannot retrieve the 
+
+        First we make an exception for cases were we cannot retrieve the
         version number, we accept the software as valid.
 
         Second, checks against the minimum supported version. If the
@@ -222,7 +202,11 @@ class SubstancePainterLauncher(SoftwareLauncher):
                     False,
                     "Executable '%s' didn't meet the version requirements, "
                     "%s is older than the minimum supported %s"
-                    % (sw_version.path, sw_version.version, self.minimum_supported_version),
+                    % (
+                        sw_version.path,
+                        sw_version.version,
+                        self.minimum_supported_version,
+                    ),
                 )
 
         # third if the version is new enough, we check if we have any

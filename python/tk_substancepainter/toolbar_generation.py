@@ -7,12 +7,13 @@ from substancepainter_core.toolbar_registry import ToolbarRegistry
 
 
 class ToolbarGenerator(object):
-
     def __init__(self, engine):
         self._engine = engine
-        self.toolbar_handle = None
-        self.toolbar_commands = engine.get_setting("toolbar_commands", [])
+        self.toolbar_handle = substance_painter.ui.add_toolbar(
+            "Locksmith Toolbar", "ls_substance_toolbar"
+        )
         self.plugin_actions = []
+        self.toolbar_commands = []
 
     def cleanup(self):
         for plugin_action in self.plugin_actions:
@@ -20,9 +21,9 @@ class ToolbarGenerator(object):
         substance_painter.ui.delete_ui_element(self.toolbar_handle)
 
     def create_toolbar(self):
+        self.toolbar_commands = self._engine.get_setting("toolbar_commands", [])
         if not self.toolbar_commands:
             return
-        self.toolbar_handle = substance_painter.ui.add_toolbar("Locksmith Toolbar", "ls_substance_toolbar")
         self.toolbar_handle.clear()
         for (cmd_name, cmd_details) in self._engine.commands.items():
             if cmd_name in self.toolbar_commands:

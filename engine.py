@@ -25,7 +25,7 @@ def to_new_version_system(version):
     https://docs.substance3d.com/spdoc/version-2020-1-6-1-0-194216357.html
 
     The way we support this new version system is to use LooseVersion for
-    version comparisons. We modify the major version if the version is higher 
+    version comparisons. We modify the major version if the version is higher
     than 2017.1.0 for the version to become in the style of 6.1, by literally
     subtracting 2014 to the major version component.
     This leaves us always with a predictable version system:
@@ -39,9 +39,9 @@ def to_new_version_system(version):
     according to:
     https://docs.substance3d.com/spdoc/all-changes-188973073.html
 
-    Note that this change means that the LooseVersion is good for comparisons 
-    but NEVER for printing, it would simply print the same version as 
-    LooseVersion does not support rebuilding of the version string from it's 
+    Note that this change means that the LooseVersion is good for comparisons
+    but NEVER for printing, it would simply print the same version as
+    LooseVersion does not support rebuilding of the version string from it's
     components
     """
     version = LooseVersion(str(version))
@@ -51,7 +51,6 @@ def to_new_version_system(version):
 
 
 class SubstancePainterEngine(Engine):
-
     def __init__(self, *args, **kwargs):
         """
         Engine Constructor
@@ -84,7 +83,7 @@ class SubstancePainterEngine(Engine):
     @property
     def host_info(self):
         """
-        :returns: A dictionary with information about the application hosting 
+        :returns: A dictionary with information about the application hosting
                   his engine.
 
         The returned dictionary is of the following form on success:
@@ -105,6 +104,7 @@ class SubstancePainterEngine(Engine):
         host_info = {"name": "SubstancePainter", "version": "unknown"}
         try:
             from application_core.windows import WindowsFileDetails
+
             details = WindowsFileDetails(sys.executable)
             host_info["version"] = ".".join((str(x) for x in details.file_version))
         except:
@@ -119,7 +119,7 @@ class SubstancePainterEngine(Engine):
         self.logger.debug("%s: Initializing...", self)
         self.tk_substancepainter = self.import_module("tk_substancepainter")
         self.utils = self.tk_substancepainter.utils
-        
+
         # check that we are running an ok version of Substance Painter
         current_os = sys.platform
         if current_os not in ["darwin", "win32", "linux64"]:
@@ -131,7 +131,7 @@ class SubstancePainterEngine(Engine):
 
         # default menu name is Shotgun but this can be overridden
         # in the configuration to be sgtk in case of conflicts
-        self._menu_name = "Shotgun"
+        self._menu_name = "ShotGrid"
         if self.get_setting("use_sgtk_as_menu_name", False):
             self._menu_name = "Sgtk"
 
@@ -164,11 +164,15 @@ class SubstancePainterEngine(Engine):
         self.create_shotgun_toolbar()
 
         from sgtk.platform.qt import QtCore
+
         app = QtCore.QCoreApplication.instance()
         app.aboutToQuit.connect(self.destroy)
 
         # emit an engine started event
         self.sgtk.execute_core_hook(TANK_ENGINE_INIT_HOOK_NAME, engine=self)
+
+    def post_context_change(self, old_context, new_context):
+        self.create_shotgun_toolbar()
 
     def destroy_engine(self):
         """
@@ -184,7 +188,9 @@ class SubstancePainterEngine(Engine):
             self._toolbar_generator = None
 
     def _create_dialog(self, title, bundle, widget, parent):
-        dialog = super(SubstancePainterEngine, self)._create_dialog(title, bundle, widget, parent)
+        dialog = super(SubstancePainterEngine, self)._create_dialog(
+            title, bundle, widget, parent
+        )
         self._apply_external_styleshet(self, dialog)
         qss = dialog.styleSheet()
         qss = qss.replace("{{ENGINE_ROOT_PATH}}", self.disk_location)
@@ -198,9 +204,12 @@ class SubstancePainterEngine(Engine):
         """
         if not self._menu_generator:
             self._menu_generator = self.tk_substancepainter.MenuGenerator(
-                self, self._menu_name)
+                self, self._menu_name
+            )
             substance_painter.ui.add_menu(self._menu_generator.menu_handle)
-        self._menu_generator.create_menu()
+        self._menu_generator.menu_handle.aboutToShow.connect(
+            self._menu_generator.create_menu
+        )
 
     def create_shotgun_toolbar(self):
         """
