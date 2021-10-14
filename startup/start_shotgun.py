@@ -138,7 +138,10 @@ def start_plugin():
 
 
 def close_plugin():
-    pass
+    import sgtk
+
+    engine = sgtk.platform.current_engine()
+    engine.destroy()
 
 
 if __name__ == "__main__":
