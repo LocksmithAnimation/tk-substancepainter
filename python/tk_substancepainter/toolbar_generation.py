@@ -3,6 +3,7 @@ import importlib
 from sgtk.platform.qt import QtGui, QtCore
 import substance_painter
 import substance_painter_plugins
+import substancepainter_core  # import populates the ToolbarRegistry
 from substancepainter_core.toolbar_registry import ToolbarRegistry
 
 
@@ -13,11 +14,14 @@ class ToolbarGenerator(object):
             "Locksmith Toolbar", "ls_substance_toolbar"
         )
         self.plugin_actions = []
+        self.tool_actions = []
         self.toolbar_commands = []
 
     def cleanup(self):
         for plugin_action in self.plugin_actions:
             ToolbarRegistry.get_registry().remove_action(plugin_action)
+        for tool_action in self.tool_actions:
+            ToolbarRegistry.get_registry().remove_action(tool_action)
         substance_painter.ui.delete_ui_element(self.toolbar_handle)
 
     def create_toolbar(self):
@@ -29,6 +33,7 @@ class ToolbarGenerator(object):
             if cmd_name in self.toolbar_commands:
                 self.add_shotgun_action(cmd_name, cmd_details)
         self.add_plugin_actions()
+        self.add_tool_actions()
 
     def add_divider(self):
         divider = QtGui.QAction(self.toolbar_handle)
@@ -54,6 +59,16 @@ class ToolbarGenerator(object):
         for plugin_action in self.plugin_actions:
             plugin_action.setParent(self.toolbar_handle)
             self.toolbar_handle.addAction(plugin_action)
+
+    def add_tool_actions(self):
+        self.tool_actions = (
+            ToolbarRegistry.get_registry().toolbar_actions["tools"].values()
+        )
+        if self.tool_actions:
+            self.add_divider()
+        for tool_action in self.tool_actions:
+            tool_action.setParent(self.toolbar_handle)
+            self.toolbar_handle.addAction(tool_action)
 
     def get_plugin_actions(self):
         plugin_actions = []
