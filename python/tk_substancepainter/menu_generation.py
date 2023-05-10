@@ -39,19 +39,28 @@ class MenuGenerator(object):
         self._menu_name = menu_name
         self.menu_handle = QtWidgets.QMenu(self._menu_name, None)
         self.sub_menus = []
+        self.actions = []
 
     def cleanup(self):
         """
         If sub-menus are not destroyed utterly they will cause Substance to
         crash at fun and unexpected moments.
         """
-        self.sub_menus.reverse() # Ensure leaf menus are cleaned up before their parents
-        for sub_menu in self.sub_menus:
-            self.menu_handle.removeAction(sub_menu.menuAction())
-            sub_menu.deleteLater()
-        self.sub_menus = []
+        self.clear_menu()
         substance_painter.ui.delete_ui_element(self.menu_handle)
         self.menu_handle = None
+
+    def clear_menu(self):
+        self.sub_menus.reverse()  # Ensure leaf menus are cleaned up before their parents
+        for sub_menu in self.sub_menus:
+            self.menu_handle.removeAction(sub_menu.menuAction())
+            sub_menu.clear()
+            substance_painter.ui.delete_ui_element(sub_menu)
+        self.sub_menus = []
+        self.menu_handle.clear()
+        for action in self.actions:
+            substance_painter.ui.delete_ui_element(action)
+            self.actions = []
 
     def create_menu(self, *args):
         """
@@ -59,8 +68,7 @@ class MenuGenerator(object):
         In order to have commands enable/disable themselves based on the
         enable_callback, re-create the menu items every time.
         """
-
-        self.menu_handle.clear()
+        self.clear_menu()
 
         # now add the context item on top of the main menu
         self._context_menu = self._add_context_menu()
@@ -70,7 +78,7 @@ class MenuGenerator(object):
 
         # now enumerate all items and create menu objects for them
         menu_items = []
-        for (cmd_name, cmd_details) in self._engine.commands.items():
+        for cmd_name, cmd_details in self._engine.commands.items():
             menu_items.append(AppCommand(cmd_name, self, cmd_details))
 
         # sort list of commands in name order
@@ -148,7 +156,7 @@ class MenuGenerator(object):
                 action.setStatusTip(properties["tooltip"])
             if "enable_callback" in properties:
                 action.setEnabled(properties["enable_callback"]())
-
+        self.actions.append(action)
         return action
 
     def _add_context_menu(self):
@@ -190,7 +198,6 @@ class MenuGenerator(object):
         # launch one window for each location on disk
         paths = self._engine.context.filesystem_locations
         for disk_location in paths:
-
             # get the setting
             system = sys.platform
 
@@ -268,7 +275,7 @@ class AppCommand(object):
         app_instance = self.properties["app"]
         engine = app_instance.engine
 
-        for (app_instance_name, app_instance_obj) in engine.apps.items():
+        for app_instance_name, app_instance_obj in engine.apps.items():
             if app_instance_obj == app_instance:
                 # found our app!
                 return app_instance_name
