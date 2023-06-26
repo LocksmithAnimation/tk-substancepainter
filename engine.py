@@ -171,6 +171,9 @@ class SubstancePainterEngine(Engine):
         # emit an engine started event
         self.sgtk.execute_core_hook(TANK_ENGINE_INIT_HOOK_NAME, engine=self)
 
+    def post_context_change(self, old_context, new_context):
+        self.create_shotgun_toolbar()
+
     def destroy_engine(self):
         """
         Cleanup after ourselves
