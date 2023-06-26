@@ -112,6 +112,7 @@ configuration:
                 "Save File",
                 "Version Up",
                 "Substance Exporter",
+                "Loader",
             ]
         values:
             type: str
@@ -126,6 +127,3 @@ description: "Shotgun Integration for Substance Painter"
 # Required minimum versions for this item to run
 requires_shotgun_version:
 requires_core_version: "v0.18.8"
-
-frameworks:
-    - { "name": "ls-framework-shotgunutils", "version": "v0.x.x" }
