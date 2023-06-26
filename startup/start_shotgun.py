@@ -24,18 +24,18 @@ __email__ = "diegogh2000@gmail.com"
 
 
 def display_error(logger, msg):
-    logger.error("Shotgun Error | SubstancePainter engine | %s " % msg)
-    print("Shotgun Error | SubstancePainter engine | %s " % msg)
+    logger.error(f"Shotgun Error | SubstancePainter engine | {msg}")
+    print(f"Shotgun Error | SubstancePainter engine | {msg}")
 
 
 def display_warning(logger, msg):
-    logger.warning("Shotgun Warning | SubstancePainter engine | %s " % msg)
-    print("Shotgun Warning | SubstancePainter engine | %s " % msg)
+    logger.warning(f"Shotgun Warning | SubstancePainter engine | {msg}")
+    print(f"Shotgun Warning | SubstancePainter engine | {msg}")
 
 
 def display_info(logger, msg):
-    logger.info("Shotgun Info | SubstancePainter engine | %s " % msg)
-    print("Shotgun Info | SubstancePainter engine | %s " % msg)
+    logger.info(f"Shotgun Info | SubstancePainter engine | {msg}")
+    print(f"Shotgun Info | SubstancePainter engine | {msg}")
 
 
 def start_toolkit_classic():
@@ -69,25 +69,25 @@ def start_toolkit_classic():
     except Exception as e:
         msg = (
             "Shotgun: Could not create context! Shotgun Pipeline Toolkit"
-            " will be disabled. Details: %s" % e
+            f" will be disabled. Details: {e}"
         )
         etype, value, tb = sys.exc_info()
         msg += "".join(traceback.format_exception(etype, value, tb))
         display_error(logger, msg)
         return
 
-    substancepainter_initialize.shelf.register_pipeline_shelf()
+    # substancepainter_initialize.shelf.register_pipeline_shelf()
 
     try:
         # Start up the toolkit engine from the environment data
         logger.debug(
-            "Launching engine instance '%s' for context %s" % (env_engine, env_context)
+            f"Launching engine instance '{env_engine}' for context {env_context}"
         )
         sgtk.platform.start_engine(env_engine, context.sgtk, context)
-        logger.debug("Current engine '%s'" % sgtk.platform.current_engine())
+        logger.debug(f"Current engine '{sgtk.platform.current_engine()}'")
 
     except Exception as e:
-        msg = "Shotgun: Could not start engine. Details: %s" % e
+        msg = f"Shotgun: Could not start engine. Details: {e}"
         etype, value, tb = sys.exc_info()
         msg += "".join(traceback.format_exception(etype, value, tb))
         display_error(logger, msg)
@@ -104,7 +104,7 @@ def start_toolkit():
     try:
         import sgtk
     except Exception as e:
-        msg = "Shotgun: Could not import sgtk! Disabling for now: %s" % e
+        msg = f"Shotgun: Could not import sgtk! Disabling for now: {e}"
         print(msg)
         return
 
@@ -117,7 +117,7 @@ def start_toolkit():
     # Check if a file was specified to open and open it.
     file_to_open = os.environ.get("SGTK_FILE_TO_OPEN")
     if file_to_open:
-        msg = "Shotgun: Opening '%s'..." % file_to_open
+        msg = f"Shotgun: Opening '{file_to_open}'..."
         # TODO load a project if specified
         # .App.loadProject(file_to_open)
 
@@ -141,7 +141,8 @@ def close_plugin():
     import sgtk
 
     engine = sgtk.platform.current_engine()
-    engine.destroy()
+    if engine:
+        engine.destroy()
 
 
 if __name__ == "__main__":

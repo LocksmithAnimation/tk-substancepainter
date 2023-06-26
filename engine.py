@@ -61,7 +61,7 @@ class SubstancePainterEngine(Engine):
         self._shutting_down = False
         self.__qt_panels = {}
         self.__qt_dialogs = []
-        super(SubstancePainterEngine, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     @property
     def register_toggle_debug_command(self):
@@ -116,7 +116,7 @@ class SubstancePainterEngine(Engine):
         Initializes the Substance Painter engine.
         """
 
-        self.logger.debug("%s: Initializing...", self)
+        self.logger.debug(f"{self}: Initializing...")
         self.tk_substancepainter = self.import_module("tk_substancepainter")
         self.utils = self.tk_substancepainter.utils
 
@@ -145,7 +145,7 @@ class SubstancePainterEngine(Engine):
         if painter_version < painter_min_supported_version:
             msg = (
                 "Shotgun integration is not compatible with Substance Painter versions"
-                " older than %s" % MINIMUM_SUPPORTED_VERSION
+                f" older than {MINIMUM_SUPPORTED_VERSION}"
             )
             raise sgtk.TankError(msg)
 
@@ -171,21 +171,27 @@ class SubstancePainterEngine(Engine):
         # emit an engine started event
         self.sgtk.execute_core_hook(TANK_ENGINE_INIT_HOOK_NAME, engine=self)
 
-    def post_context_change(self, old_context, new_context):
-        self.create_shotgun_toolbar()
-
     def destroy_engine(self):
         """
         Cleanup after ourselves
         """
         self.logger.debug("Destroying Substance Painter Engine")
         self.close_windows()
+        self.logger.debug("Windows Closed")
         if self._menu_generator:
+            self._menu_generator.menu_handle.aboutToShow.disconnect(
+                self._menu_generator.create_menu
+            )
             self._menu_generator.cleanup()
             self._menu_generator = None
+        self.logger.debug("Menu Cleanedup")
         if self._toolbar_generator:
             self._toolbar_generator.cleanup()
             self._toolbar_generator = None
+        self.logger.debug("Toolbar Cleanedup")
+        super().destroy_engine()
+        self.tk_substancepainter = None
+        self.logger.debug("Finished Destroying Substance Painter Engine")
 
     def _create_dialog(self, title, bundle, widget, parent):
         dialog = super(SubstancePainterEngine, self)._create_dialog(
@@ -207,9 +213,9 @@ class SubstancePainterEngine(Engine):
                 self, self._menu_name
             )
             substance_painter.ui.add_menu(self._menu_generator.menu_handle)
-        self._menu_generator.menu_handle.aboutToShow.connect(
-            self._menu_generator.create_menu
-        )
+            self._menu_generator.menu_handle.aboutToShow.connect(
+                self._menu_generator.create_menu
+            )
 
     def create_shotgun_toolbar(self):
         """
@@ -247,7 +253,7 @@ class SubstancePainterEngine(Engine):
         if not self.has_ui:
             self.logger.error(
                 "Sorry, this environment does not support UI display! Cannot "
-                "show the requested window '%s'." % title
+                f"show the requested window '{title}'."
             )
             return None
 
@@ -256,9 +262,9 @@ class SubstancePainterEngine(Engine):
             title, bundle, widget_class, *args, **kwargs
         )
 
-        self.__qt_dialogs.append(dialog)
+        # self.__qt_dialogs.append(dialog)
 
-        self.logger.debug("Showing dialog: %s" % (title,))
+        self.logger.debug(f"Showing dialog: {title}")
         dialog.show()
 
         return widget
@@ -301,7 +307,8 @@ class SubstancePainterEngine(Engine):
         else:
             fct = substance_painter.logging.error
 
-        self.async_execute_in_main_thread(fct, msg)
+        # self.async_execute_in_main_thread(fct, msg)
+        fct(msg)
 
     def close_windows(self):
         """
@@ -310,9 +317,10 @@ class SubstancePainterEngine(Engine):
         """
 
         for dialog in self.__qt_dialogs:
-            dialog.hide()
-            dialog.setParent(None)
-            dialog.deleteLater()
+            substance_painter.ui.delete_ui_element(dialog)
+            # dialog.hide()
+            # dialog.setParent(None)
+            # dialog.deleteLater()
 
         # Make a copy of the list of Tank dialogs that have been created by the
         # engine and are still opened since the original list will be updated
@@ -324,11 +332,11 @@ class SubstancePainterEngine(Engine):
             panel = self.__qt_panels.pop(panel_id)
             panel_window_title = panel.windowTitle()
             try:
-                self.logger.debug("Closing dialog %s", panel_window_title)
+                self.logger.debug(f"Closing dialog {panel_window_title}")
                 panel.widget().close()
                 substance_painter.ui.delete_ui_element(panel)
             except Exception as exception:
                 traceback.print_exc()
                 self.logger.error(
-                    "Cannot close dialog %s: %s", panel_window_title, exception
+                    f"Cannot close dialog {panel_window_title}: {exception}"
                 )
