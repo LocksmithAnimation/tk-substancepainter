@@ -118,6 +118,7 @@ class SubstancePainterEngine(Engine):
 
         self.logger.debug(f"{self}: Initializing...")
         self.tk_substancepainter = self.import_module("tk_substancepainter")
+        self.utils = self.tk_substancepainter.utils
 
         # check that we are running an ok version of Substance Painter
         current_os = sys.platform
@@ -165,7 +166,7 @@ class SubstancePainterEngine(Engine):
         from sgtk.platform.qt import QtCore
 
         app = QtCore.QCoreApplication.instance()
-        # app.aboutToQuit.connect(self.destroy)
+        app.aboutToQuit.connect(self.destroy)
 
         # emit an engine started event
         self.sgtk.execute_core_hook(TANK_ENGINE_INIT_HOOK_NAME, engine=self)
@@ -207,7 +208,6 @@ class SubstancePainterEngine(Engine):
         """
         Creates the main Shotgun menu in Substance Painter.
         """
-        return
         if not self._menu_generator:
             self._menu_generator = self.tk_substancepainter.MenuGenerator(
                 self, self._menu_name
@@ -221,7 +221,6 @@ class SubstancePainterEngine(Engine):
         """
         Creates a Shotgun toolbar in Substance Painter
         """
-        return
         if not self._toolbar_generator:
             self._toolbar_generator = self.tk_substancepainter.ToolbarGenerator(self)
         self._toolbar_generator.create_toolbar()
@@ -263,7 +262,7 @@ class SubstancePainterEngine(Engine):
             title, bundle, widget_class, *args, **kwargs
         )
 
-        self.__qt_dialogs.append(dialog)
+        # self.__qt_dialogs.append(dialog)
 
         self.logger.debug(f"Showing dialog: {title}")
         dialog.show()

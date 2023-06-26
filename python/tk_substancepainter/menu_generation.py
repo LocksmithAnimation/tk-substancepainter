@@ -13,11 +13,9 @@ Menu handling for Substance Painter
 
 """
 
-import tank
 import sys
 import os
 import unicodedata
-import operator
 
 import substance_painter
 
@@ -26,7 +24,7 @@ __author__ = "Diego Garcia Huerta"
 __email__ = "diegogh2000@gmail.com"
 
 
-from tank.platform.qt5 import QtWidgets, QtGui, QtCore, QtWebSockets, QtNetwork
+from tank.platform.qt5 import QtWidgets, QtGui, QtCore
 
 
 class MenuGenerator(object):
@@ -39,7 +37,6 @@ class MenuGenerator(object):
         self._menu_name = menu_name
         self.menu_handle = QtWidgets.QMenu(self._menu_name, None)
         self.sub_menus = []
-        self.actions = []
 
     def cleanup(self):
         """
@@ -58,9 +55,6 @@ class MenuGenerator(object):
             substance_painter.ui.delete_ui_element(sub_menu)
         self.sub_menus = []
         self.menu_handle.clear()
-        for action in self.actions:
-            substance_painter.ui.delete_ui_element(action)
-            self.actions = []
 
     def create_menu(self, *args):
         """
@@ -71,7 +65,7 @@ class MenuGenerator(object):
         self.clear_menu()
 
         # now add the context item on top of the main menu
-        self._context_menu = self._add_context_menu()
+        context_menu = self._add_context_menu()
 
         # add menu divider
         self._add_divider(self.menu_handle)
@@ -110,7 +104,7 @@ class MenuGenerator(object):
         for cmd in menu_items:
             if cmd.get_type() == "context_menu":
                 # context menu!
-                cmd.add_command_to_menu(self._context_menu)
+                cmd.add_command_to_menu(context_menu)
 
             else:
                 # normal menu
@@ -148,15 +142,11 @@ class MenuGenerator(object):
         action.triggered.connect(callback, connection_type)
 
         if properties:
-            # if "icon" in properties:
-            #     icon = QtGui.QIcon(properties["icon"])
-            #     action.setIcon(icon)
             if "tooltip" in properties:
                 action.setToolTip(properties["tooltip"])
                 action.setStatusTip(properties["tooltip"])
             if "enable_callback" in properties:
                 action.setEnabled(properties["enable_callback"]())
-        self.actions.append(action)
         return action
 
     def _add_context_menu(self):

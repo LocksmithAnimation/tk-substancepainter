@@ -76,7 +76,7 @@ def start_toolkit_classic():
         display_error(logger, msg)
         return
 
-    substancepainter_initialize.shelf.register_pipeline_shelf()
+    # substancepainter_initialize.shelf.register_pipeline_shelf()
 
     try:
         # Start up the toolkit engine from the environment data
