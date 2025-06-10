@@ -24,7 +24,7 @@ __author__ = "Diego Garcia Huerta"
 __email__ = "diegogh2000@gmail.com"
 
 
-from tank.platform.qt5 import QtWidgets, QtGui, QtCore
+from locksmith.Qt import QtWidgets, QtGui, QtCore
 
 
 class MenuGenerator(object):
